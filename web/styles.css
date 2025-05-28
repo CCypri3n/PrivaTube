@@ -1,0 +1,422 @@
+/* --- Base Styles (Dark Mode) --- */
+body {
+  background-color: #222;
+  color: #e2e2e2;
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+}
+
+/* --- Header --- */
+.main-header {
+  position: fixed;
+  top: 24px;
+  left: 32px;
+  z-index: 10;
+  text-align: left;
+}
+.main-header h1 {
+  color: crimson;
+  font-size: 2em;
+  margin: 0;
+}
+.main-header h5 {
+  color: #aaa;
+  margin: 4px 0 0 0;
+  font-weight: normal;
+}
+
+/* --- Country Code (Top Right) --- */
+#country-code {
+  position: fixed;
+  top: 24px;
+  right: 32px;
+  background: rgba(128, 128, 128, 0.7);
+  color: white;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 12px;
+  z-index: 20;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* --- Search Bar (Centered Top) --- */
+.search-bar-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100vw;
+  margin-top: 40px;
+  margin-bottom: 24px;
+  z-index: 5;
+  position: static;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  background: rgba(161, 161, 161, 0.7);
+  border-radius: 24px;
+  padding: 8px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #eee;
+  font-size: 1.1em;
+  padding: 8px;
+  border-radius: 24px;
+  width: 220px;
+}
+.search-btn {
+  background: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.search-btn:hover {
+  background: rgba(0,0,0,0.1);
+}
+
+/* --- Video Grid --- */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 120px auto 0 auto;
+  max-width: 1100px;
+  width: 90vw;
+}
+.video-item img {
+  width: 100%;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: box-shadow 0.2s, filter 0.2s;
+  filter: grayscale(20%);
+}
+.video-item img:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  filter: grayscale(0%);
+}
+
+/* --- Channel Item --- */
+.channel-item {
+  background: rgba(200, 200, 200, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s;
+  text-align: center;
+}
+.channel-item:hover {
+  background: rgba(220, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+.channel-item img {
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+}
+
+/* --- Load More Button --- */
+#load-more-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 32px 0 24px 0;
+}
+#load-more-btn {
+  background-color: crimson;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 12px 32px;
+  font-size: 1.1em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: background 0.2s;
+}
+#load-more-btn:hover {
+  background-color: #b8002f;
+}
+
+/* --- Typography & Utility --- */
+h2, h3, h4 {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #f4f4f4;
+}
+h1, h5 {
+  color: crimson;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.1;
+}
+.button {
+  background-color: crimson;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+.button:hover {
+  box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
+}
+.attention {
+  font-size: 0.85em;
+  color: #888;
+  font-style: italic;
+  margin-left: 6px;
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 900px) {
+  .video-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .search-bar-wrapper {
+    margin-top: 80px;
+    margin-bottom: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .video-grid {
+    grid-template-columns: 1fr;
+  }
+  .main-header {
+    left: 12px;
+    top: 12px;
+  }
+  .search-bar-wrapper {
+    top: 80px;
+  }
+}
+
+.country-dropdown {
+  position: fixed;
+  top: 24px;
+  right: 32px;
+  z-index: 30;
+  user-select: none;
+}
+
+#country-code-btn {
+  background: rgba(128, 128, 128, 0.7);
+  color: white;
+  font-weight: bold;
+  font-family: Arial, Helvetica, sans-serif;
+  padding: 6px 18px 6px 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  font-size: 1em;
+  transition: background 0.2s;
+  outline: none;
+}
+
+#country-code-btn:hover,
+#country-code-btn.active {
+  background: rgba(128, 128, 128, 0.9);
+}
+
+.country-list {
+  display: none;
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background: rgba(40, 40, 40, 0.97);
+  border-radius: 10px;
+  min-width: 140px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+  padding: 4px 0;
+}
+
+.country-list div {
+  padding: 8px 18px 8px 18px;
+  color: #eee;
+  cursor: pointer;
+  font-size: 1em;
+  transition: background 0.15s;
+  border-radius: 6px;
+}
+
+.country-list div:hover {
+  background: rgba(220,0,0,0.15);
+  color: #fff;
+}
+
+/* --- Channel Banner --- */
+#channel-banner {
+  display: none;
+  width: 100vw;
+  max-width: 100%;
+  margin: 0 auto 32px auto;
+  position: relative;
+  z-index: 2;
+}
+
+.channel-banner-inner {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  background: #181818;
+}
+
+.channel-banner-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.65) blur(0.5px);
+}
+
+.channel-banner-title {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 2.2em;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 16px #000, 0 1px 1px #333;
+  background: rgba(0,0,0,0.22);
+  padding: 10px 32px;
+  border-radius: 16px;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+/* Responsive adjustments for banner */
+@media (max-width: 900px) {
+  .channel-banner-inner {
+    max-width: 98vw;
+  }
+  .channel-banner-title {
+    font-size: 1.3em;
+    padding: 8px 16px;
+    bottom: 10px;
+  }
+  .channel-banner-img {
+    height: 110px;
+  }
+}
+@media (max-width: 600px) {
+  .channel-banner-title {
+    font-size: 1em;
+    padding: 6px 10px;
+    bottom: 8px;
+  }
+  .channel-banner-img {
+    height: 70px;
+  }
+}
+
+.channel-link {
+  color: #ff4b6e;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: color 0.15s;
+  margin-bottom: 0px;
+}
+.channel-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.video-date {
+  color: #bbb;
+  font-size: 0.95em;
+  margin-bottom: 1px;
+}
+
+.video-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.98em;
+  margin-bottom: 0;
+  margin-top: 0;
+}
+
+.video-meta-sep {
+  color: #666;
+  font-size: 1em;
+}
+
+#api-key-modal {
+  position: fixed;
+  z-index: 10000;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.api-key-modal-backdrop {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.65);
+}
+.api-key-modal-content {
+  position: relative;
+  background: #232323;
+  padding: 32px 28px 24px 28px;
+  border-radius: 18px;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.2);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#api-key-input {
+  margin-top: 16px;
+  font-size: 1.1em;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #181818;
+  color: #f4f4f4;
+  width: 320px;
+  max-width: 90vw;
+}
+#api-key-save-btn {
+  margin-top: 18px;
+  background: crimson;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+#api-key-save-btn:hover {
+  background: #b8002f;
+}
