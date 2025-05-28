@@ -62,22 +62,12 @@ function promptForApiKey() {
 
 // --- Fetch API Key from localStorage or Key.txt ---
 async function fetchApiKey() {
-  // Try localStorage first
-  const key = localStorage.getItem('YOUTUBE_API_KEY');
-  if (key && key.length > 10) return key;
-
-  // Fallback: Try Key.txt (for dev/server use)
-  try {
-    const response = await fetch('Key.txt');
-    const text = await response.text();
-    if (text) return text.trim();
-  } catch (e) {}
-
-  // If not found, prompt user
+  // Always prompt for API key on GitHub Pages
   promptForApiKey();
   // Return a promise that never resolves, to halt further init until key is set
   return new Promise(() => {});
 }
+
 
 // --- App Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
