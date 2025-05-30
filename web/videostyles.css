@@ -1,0 +1,107 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    }
+    body {
+    background-color: #222;
+    color: #e2e2e2;
+    font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    }
+
+    .video-embed {
+    margin-top: 10vh;
+    width: 100vw;
+    height: 90vh;
+    border: none;
+    display: block;
+    }
+    .info-section {
+    padding: 32px 24px;
+    background: #222;
+    min-height: 400px;
+    }
+
+    /* --- Header --- */
+    .main-header {
+    position: fixed;
+    top: 12px;
+    left: 16px;
+    z-index: 10;
+    text-align: left;
+    }
+    .main-header h1 {
+    color: hsla(348, 83%, 47%, 0.5);
+    font-size: 2em;
+    margin: 0;
+    }
+    .main-header h5 {
+    color: rgba(171, 171, 171, 0.5);
+    margin: 4px 0 0 0;
+    font-weight: normal;
+    }
+
+/* --- Country Code (Top Right) --- */
+#country-code {
+  position: fixed;
+  margin-top: 12px;
+  right: 16px;
+  background: rgba(128, 128, 128, 0.7);
+  color: white;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 12px;
+  z-index: 20;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* --- Search Bar (Centered Top) --- */
+.search-bar-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100vw;
+  margin-top: 40px;
+  margin-bottom: 24px;
+  z-index: 5;
+  position: static;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  background: rgba(161, 161, 161, 0.7);
+  border-radius: 24px;
+  padding: 8px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #eee;
+  font-size: 1.1em;
+  padding: 8px;
+  border-radius: 24px;
+  width: 220px;
+}
+.search-btn {
+  background: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.search-btn:hover {
+  background: rgba(0,0,0,0.1);
+}

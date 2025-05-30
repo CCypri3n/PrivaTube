@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>PrivaTube</title>
     <link rel="stylesheet" href="web/styles.css">
     <link rel="icon" href="web/icons/icon-96.png">
 </head>
+
 <body>
-    <header class="main-header" onclick="showHomepage()" style="cursor:pointer;">
+    <header class="main-header" onclick="headerClick()" style="cursor:pointer;">
         <h1>PrivaTube</h1>
         <h5>by YoutubeSwapper</h5>
     </header>
@@ -32,6 +34,8 @@
             </button>
         </div>
     </div>
+
+    <div id="video-player"></div>
 
     <div id="channel-banner" style="display:none;"></div>
 

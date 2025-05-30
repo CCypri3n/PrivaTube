@@ -89,9 +89,13 @@ async function fetchApiKey() {
   }
 }
 
+async function headerClick() {
+  closePlayer();
+  showHomepage();
+}
+
 // --- Homepage Trending Videos ---
 async function showHomepage(loadMore = false) {
-  document.getElementById('channel-banner').style.display = 'none';
   currentMode = 'home';
   const resultsDiv = document.getElementById('results');
   if (!loadMore) {
@@ -125,6 +129,7 @@ async function showHomepage(loadMore = false) {
 
 // --- Search Videos ---
 async function searchVideos(loadMore = false) {
+  closePlayer();
   document.getElementById('channel-banner').style.display = 'none';
   const query = document.getElementById('searchQuery').value;
   if (!query.trim()) return;
@@ -144,13 +149,24 @@ async function searchVideos(loadMore = false) {
     // Separate videos and channels
     const videoItems = data.items.filter(item => item.id.kind === "youtube#video");
     const channelItems = data.items.filter(item => item.id.kind === "youtube#channel");
+    const channelIds = channelItems.map(item => item.id.channelId).join(',');
+    let channelStats = {};
+    if (channelIds) {
+      const statsResp = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelIds}&key=${API_KEY}`
+      );
+      const statsData = await statsResp.json();
+      statsData.items.forEach(ch => {
+        channelStats[ch.id] = ch.statistics.subscriberCount;
+      });
+    }
     // Filter out Shorts from videos
     const filteredVideos = await filterOutShorts(videoItems);
     const finalItems = [...filteredVideos, ...channelItems];
     if (loadMore) {
-      appendResults(finalItems);
+      appendResults(finalItems, channelStats);
     } else {
-      displayResults(finalItems);
+      displayResults(finalItems, channelStats);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (error) {
@@ -255,22 +271,21 @@ async function fetchChannelVideos(channelId, loadMore = false) {
 
 
 // --- Results Rendering Helpers ---
-function displayResults(items) {
+function displayResults(items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
   if (!items || items.length === 0) {
     resultsDiv.innerHTML = "<p>No results found.</p>";
     toggleLoadMoreButton(false);
     return;
   }
-  resultsDiv.innerHTML = items.map(renderResultItem).join('');
+  resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats)).join('');
 }
 
-function appendResults(items) {
+function appendResults(items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
-  resultsDiv.innerHTML += items.map(renderResultItem).join('');
+  resultsDiv.innerHTML += items.map(item => renderResultItem(item, channelStats)).join('');
 }
-
-function renderResultItem(item) {
+function renderResultItem(item, channelStats = {}) {
   if (item.id.kind === "youtube#video") {
     // Format date as "YYYY-MM-DD" or any other style you prefer
     const dateStr = item.snippet.publishedAt
@@ -278,8 +293,8 @@ function renderResultItem(item) {
       : '';
     return `
         <div class="video-item">
-            <a href="https://www.youtube-nocookie.com/embed/${item.id.videoId}"  rel="noopener">
-            <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
+            <a href="#" onclick="playVideo('${item.id.videoId}'); return false;">
+              <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
             </a>
             <h3>${item.snippet.title}</h3>
             <div class="video-meta">
@@ -292,11 +307,13 @@ function renderResultItem(item) {
         </div>
         `;
   } else if (item.id.kind === "youtube#channel") {
+    const subs = channelStats[item.id.channelId];
     return `
       <div class="channel-item" data-channel-id="${item.id.channelId}" onclick="fetchChannelVideos('${item.id.channelId}')">
         <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
         <h3>${item.snippet.title}</h3>
         <p class="attention">Click to view channel videos</p>
+        <p class="subs">${subs ? `${Number(subs).toLocaleString()} subscribers` : ''}</p>
       </div>
     `;
   } else {
@@ -370,4 +387,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // Optional: log error, but don't show homepage
     console.error("API Key error:", err);
   });
+
+  const searchBtn = document.getElementById('search-btn');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', function() {
+      searchVideos();
+    });
+  }
 });
+
+function playVideo(videoId) {
+  document.body.classList.add('video-playing');
+  const videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  const playerDiv = document.getElementById('video-player');
+  const resultsDiv = document.getElementById('results');
+  const bannerDiv = document.getElementById('channel-banner');
+  playerDiv.innerHTML = `<iframe
+      class="video-embed"
+      src="${videoUrl}"
+      title="PrivaTube Video Player"
+      allow="web-share"
+      referrerpolicy="strict-origin-when-cross-origin"
+      allowfullscreen>
+    </iframe>`;
+  playerDiv.style.display = 'block';
+  if (resultsDiv) resultsDiv.style.display = 'none';
+  if (bannerDiv) bannerDiv.style.display = 'none';
+  toggleLoadMoreButton(false);
+}
+
+function closePlayer() {
+  document.body.classList.remove('video-playing');
+  const playerDiv = document.getElementById('video-player');
+  const resultsDiv = document.getElementById('results');
+  const bannerDiv = document.getElementById('channel-banner');
+  playerDiv.innerHTML = '';
+  playerDiv.style.display = 'none';
+  if (resultsDiv) resultsDiv.style.display = '';
+  if (bannerDiv) bannerDiv.style.display = '';
+}
