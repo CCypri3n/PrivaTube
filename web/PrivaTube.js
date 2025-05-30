@@ -41,46 +41,53 @@ async function filterOutShorts(videoItems) {
   return videoItems.filter(item => allowedIds.includes(item.id.videoId || item.id));
 }
 
-
-// --- Fetch API Key from Key.txt ---
 // --- API Key Modal Logic ---
-function promptForApiKey() {
+function promptForApiKey(errorMsg = "") {
   const modal = document.getElementById('api-key-modal');
+  const errorDiv = document.getElementById('api-key-error');
+  if (errorMsg) {
+    errorDiv.textContent = errorMsg;
+    errorDiv.style.display = 'block';
+  } else {
+    errorDiv.textContent = "";
+    errorDiv.style.display = 'none';
+  }
   modal.style.display = 'flex';
   document.getElementById('api-key-input').focus();
 
-  document.getElementById('api-key-save-btn').onclick = function() {
-    const key = document.getElementById('api-key-input').value.trim();
-    if (key) {
-      localStorage.setItem('YOUTUBE_API_KEY', key);
-      API_KEY = key;
-      modal.style.display = 'none';
-      showHomepage();
+  document.getElementById('api-key-save-btn').onclick = async function() {
+    const api_key = document.getElementById('api-key-input').value.trim();
+    if (api_key) {
+      // Validate the API key by making a test request
+      try {
+        const testResp = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${api_key}`);
+        if (!testResp.ok) {
+          errorDiv.textContent = "Invalid API Key. Please try again.";
+          errorDiv.style.display = 'block';
+          return;
+        }
+        // Save only if valid
+        localStorage.setItem('api_key', api_key);
+        API_KEY = api_key;
+        modal.style.display = 'none';
+        showHomepage(); // <-- Show homepage immediately, no reload
+      } catch (err) {
+        errorDiv.textContent = "Network error. Please try again.";
+        errorDiv.style.display = 'block';
+      }
     }
   };
 }
 
-// --- Fetch API Key from localStorage or Key.txt ---
 async function fetchApiKey() {
-  // Always prompt for API key on GitHub Pages
-  promptForApiKey();
-  // Return a promise that never resolves, to halt further init until key is set
-  return new Promise(() => {});
+  API_KEY = localStorage.getItem('api_key') || '';
+  if (API_KEY) {
+    return API_KEY.trim();
+  } else {
+    promptForApiKey();
+    return null;
+  }
 }
-
-
-// --- App Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
-  // ... your dropdown and load more logic ...
-
-  fetchApiKey().then(key => {
-    API_KEY = key;
-    showHomepage();
-  }).catch(err => {
-    console.error("Failed to load API Key:", err);
-  });
-});
-
 
 // --- Homepage Trending Videos ---
 async function showHomepage(loadMore = false) {
@@ -307,10 +314,39 @@ function toggleLoadMoreButton(show) {
 // --- Load More Button Handler & Enter-to-Search ---
 document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('searchQuery');
+  const btn = document.getElementById('country-code-btn');
+  const list = document.getElementById('country-list');
+  const dropdown = document.getElementById('country-dropdown');
+
   input.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       searchVideos();
     }
+  });
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    list.style.display = (list.style.display === 'block') ? 'none' : 'block';
+    btn.classList.toggle('active');
+  });
+
+  // Hide dropdown when clicking outside
+  document.addEventListener('click', () => {
+    list.style.display = 'none';
+    btn.classList.remove('active');
+  });
+
+  // Handle country selection
+  list.querySelectorAll('div').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const code = item.getAttribute('data-code');
+      btn.innerHTML = `${code} ▼`;
+      list.style.display = 'none';
+      btn.classList.remove('active');
+      // Set the global region code and refresh homepage
+      lastRegionCode = code;
+      showHomepage();
+    });
   });
 
   document.getElementById('load-more-btn').addEventListener('click', () => {
@@ -325,9 +361,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Only start app after API key is loaded!
   fetchApiKey().then(key => {
+  if (key) {
     API_KEY = key;
     showHomepage();
+  }
+  // If key is missing/invalid, promptForApiKey() is already called inside fetchApiKey()
   }).catch(err => {
-    console.error("Failed to load API Key:", err);
+    // Optional: log error, but don't show homepage
+    console.error("API Key error:", err);
   });
 });
