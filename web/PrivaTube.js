@@ -89,9 +89,13 @@ async function fetchApiKey() {
   }
 }
 
+async function headerClick() {
+  closePlayer();
+  showHomepage();
+}
+
 // --- Homepage Trending Videos ---
 async function showHomepage(loadMore = false) {
-  document.getElementById('channel-banner').style.display = 'none';
   currentMode = 'home';
   const resultsDiv = document.getElementById('results');
   if (!loadMore) {
@@ -125,6 +129,7 @@ async function showHomepage(loadMore = false) {
 
 // --- Search Videos ---
 async function searchVideos(loadMore = false) {
+  closePlayer();
   document.getElementById('channel-banner').style.display = 'none';
   const query = document.getElementById('searchQuery').value;
   if (!query.trim()) return;
@@ -144,13 +149,24 @@ async function searchVideos(loadMore = false) {
     // Separate videos and channels
     const videoItems = data.items.filter(item => item.id.kind === "youtube#video");
     const channelItems = data.items.filter(item => item.id.kind === "youtube#channel");
+    const channelIds = channelItems.map(item => item.id.channelId).join(',');
+    let channelStats = {};
+    if (channelIds) {
+      const statsResp = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelIds}&key=${API_KEY}`
+      );
+      const statsData = await statsResp.json();
+      statsData.items.forEach(ch => {
+        channelStats[ch.id] = ch.statistics.subscriberCount;
+      });
+    }
     // Filter out Shorts from videos
     const filteredVideos = await filterOutShorts(videoItems);
     const finalItems = [...filteredVideos, ...channelItems];
     if (loadMore) {
-      appendResults(finalItems);
+      appendResults(finalItems, channelStats);
     } else {
-      displayResults(finalItems);
+      displayResults(finalItems, channelStats);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (error) {
@@ -163,6 +179,7 @@ async function searchVideos(loadMore = false) {
 // --- Fetch Channel Videos ---
 
 async function fetchChannelVideos(channelId, loadMore = false) {
+  closePlayer();
   currentMode = 'channel';
   lastChannelId = channelId;
   const resultsDiv = document.getElementById('results');
@@ -255,22 +272,21 @@ async function fetchChannelVideos(channelId, loadMore = false) {
 
 
 // --- Results Rendering Helpers ---
-function displayResults(items) {
+function displayResults(items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
   if (!items || items.length === 0) {
     resultsDiv.innerHTML = "<p>No results found.</p>";
     toggleLoadMoreButton(false);
     return;
   }
-  resultsDiv.innerHTML = items.map(renderResultItem).join('');
+  resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats)).join('');
 }
 
-function appendResults(items) {
+function appendResults(items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
-  resultsDiv.innerHTML += items.map(renderResultItem).join('');
+  resultsDiv.innerHTML += items.map(item => renderResultItem(item, channelStats)).join('');
 }
-
-function renderResultItem(item) {
+function renderResultItem(item, channelStats = {}) {
   if (item.id.kind === "youtube#video") {
     // Format date as "YYYY-MM-DD" or any other style you prefer
     const dateStr = item.snippet.publishedAt
@@ -278,8 +294,8 @@ function renderResultItem(item) {
       : '';
     return `
         <div class="video-item">
-            <a href="https://www.youtube-nocookie.com/embed/${item.id.videoId}"  rel="noopener">
-            <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
+            <a href="#" onclick="playVideo('${item.id.videoId}'); return false;">
+              <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
             </a>
             <h3>${item.snippet.title}</h3>
             <div class="video-meta">
@@ -292,11 +308,13 @@ function renderResultItem(item) {
         </div>
         `;
   } else if (item.id.kind === "youtube#channel") {
+    const subs = channelStats[item.id.channelId];
     return `
       <div class="channel-item" data-channel-id="${item.id.channelId}" onclick="fetchChannelVideos('${item.id.channelId}')">
         <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
         <h3>${item.snippet.title}</h3>
         <p class="attention">Click to view channel videos</p>
+        <p class="subs">${subs ? `${Number(subs).toLocaleString()} subscribers` : ''}</p>
       </div>
     `;
   } else {
@@ -312,11 +330,12 @@ function toggleLoadMoreButton(show) {
 }
 
 // --- Load More Button Handler & Enter-to-Search ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed on page load
   const input = document.getElementById('searchQuery');
   const btn = document.getElementById('country-code-btn');
   const list = document.getElementById('country-list');
   const dropdown = document.getElementById('country-dropdown');
+
 
   input.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
@@ -360,14 +379,159 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Only start app after API key is loaded!
+  const params = new URLSearchParams(window.location.search);
+  const videoId = params.get('v');
+  if (!videoId) {
+  closePlayer();
+  }
   fetchApiKey().then(key => {
   if (key) {
     API_KEY = key;
+    if (videoId) {
+      playVideo(videoId);
+    }
+    else {
     showHomepage();
+    }
   }
   // If key is missing/invalid, promptForApiKey() is already called inside fetchApiKey()
   }).catch(err => {
     // Optional: log error, but don't show homepage
     console.error("API Key error:", err);
   });
+
+  const searchBtn = document.getElementById('search-btn');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', function() {
+      searchVideos();
+    });
+  }
 });
+
+function linkify(text) {
+  // Regex to match URLs (http/https)
+  return text.replace(
+    /(https?:\/\/[^\s]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+}
+
+// --- Video Player Logic ---
+async function videoInfoShow(videoId) {
+  if (videoId) {
+    let video = null;
+    try {
+      const resp = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${API_KEY}`);
+      const data = await resp.json();
+      if (data.items && data.items.length > 0) {
+        video = data.items[0];
+        document.getElementById('video-title').textContent = video.snippet.title;
+        document.getElementById('video-description').innerHTML = linkify(video.snippet.description);
+        document.getElementById('view-count').textContent = `${Number(video.statistics.viewCount).toLocaleString()} views`;
+        document.getElementById('like-count').textContent = `${video.statistics.likeCount ? Number(video.statistics.likeCount).toLocaleString()+" likes": ''}`;
+      } else {
+        throw new Error("No video data");
+      }
+    } catch (err) {
+      document.getElementById('video-title').textContent = 'Video Title';
+      document.getElementById('video-description').textContent = 'Video description will appear here.';
+      document.getElementById('view-count').textContent = 'Views: N/A';
+      document.getElementById('like-count').textContent = 'Likes: N/A';
+      video = null;
+    }
+
+    // Only fetch channel info if video was found
+    if (video) {
+      try {
+        const channelID = video.snippet.channelId;
+        const channelResp = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelID}&key=${API_KEY}`);
+        const channelData = await channelResp.json();
+        if (channelData.items && channelData.items.length > 0) {
+          const channel = channelData.items[0];
+          // After fetching channel info:
+          document.getElementById('channel-name').textContent = channel.snippet.title;
+          document.getElementById('channel-name').style.cursor = "pointer";
+          document.getElementById('channel-name').onclick = () => fetchChannelVideos(channelID);
+
+          document.getElementById('channel-avatar').src = channel.snippet.thumbnails.default.url;
+          document.getElementById('channel-avatar').alt = channel.snippet.title;
+          document.getElementById('channel-avatar').style.cursor = "pointer";
+          document.getElementById('channel-avatar').onclick = () => fetchChannelVideos(channelID);
+          document.getElementById('channel-subscribers').textContent =
+            channel.statistics.subscriberCount
+              ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
+              : '';
+        }
+      } catch (err) {
+        console.error("Error fetching channel info:", err);
+        document.getElementById('channel-avatar').src = '';
+        document.getElementById('channel-avatar').alt = '';
+        document.getElementById('channel-avatar').style.cursor = "default";
+        document.getElementById('channel-name').textContent = 'Channel Name';
+        document.getElementById('channel-name').style.cursor = "default";
+        document.getElementById('channel-subscribers').textContent = 'Channel Subscribers: N/A';
+      }
+    } else {
+      document.getElementById('channel-avatar').src = '';
+      document.getElementById('channel-avatar').alt = '';
+      document.getElementById('channel-name').textContent = '';
+      document.getElementById('channel-subscribers').textContent = '';
+    }
+  } else {
+    document.getElementById('video-title').textContent = "";
+    document.getElementById('video-description').textContent = "";
+    document.getElementById('video-description').innerHTML = "";
+    document.getElementById('view-count').textContent = "";
+    document.getElementById('like-count').textContent = "";
+    document.getElementById('channel-avatar').src = '';
+    document.getElementById('channel-avatar').alt = '';
+    document.getElementById('channel-avatar').style.cursor = "default";
+    document.getElementById('channel-name').textContent = '';
+    document.getElementById('channel-name').style.cursor = "default";
+    document.getElementById('channel-subscribers').textContent = '';
+  }
+}
+
+
+async function playVideo(videoId) {
+  document.body.classList.add('video-playing');
+  const videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  const playerDiv = document.getElementById('video');
+  const resultsDiv = document.getElementById('results');
+  const bannerDiv = document.getElementById('channel-banner');
+  const videoInfoDiv = document.getElementById('video-info');
+  playerDiv.innerHTML = `<iframe
+      class="video-embed"
+      src="${videoUrl}"
+      title="PrivaTube Video Player"
+      allow="web-share"
+      referrerpolicy="strict-origin-when-cross-origin"
+      allowfullscreen>
+    </iframe>`;
+  playerDiv.style.display = 'block';
+  if (resultsDiv) resultsDiv.style.display = 'none';
+  if (bannerDiv) bannerDiv.style.display = 'none';
+  if (videoInfoDiv) videoInfoDiv.style.display = 'block'; // <-- Show info
+  toggleLoadMoreButton(false);
+  videoInfoShow(videoId);
+  const url = new URL(window.location);
+  url.searchParams.set('v', videoId);
+  window.history.replaceState({}, '', url);
+}
+
+function closePlayer() {
+  document.body.classList.remove('video-playing');
+  const playerDiv = document.getElementById('video');
+  const resultsDiv = document.getElementById('results');
+  const bannerDiv = document.getElementById('channel-banner');
+  const videoInfoDiv = document.getElementById('video-info');
+  playerDiv.innerHTML = '';
+  playerDiv.style.display = 'none';
+  if (resultsDiv) resultsDiv.style.display = '';
+  if (bannerDiv) bannerDiv.style.display = '';
+  if (videoInfoDiv) videoInfoDiv.style.display = 'none'; // <-- Hide info
+  videoInfoShow(false);
+  const url = new URL(window.location);
+  url.searchParams.delete('v');
+  window.history.replaceState({}, '', url);
+}

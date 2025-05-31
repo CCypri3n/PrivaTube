@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>PrivaTube</title>
     <link rel="stylesheet" href="web/styles.css">
     <link rel="icon" href="web/icons/icon-96.png">
 </head>
+
 <body>
-    <header class="main-header" onclick="showHomepage()" style="cursor:pointer;">
+    <header class="main-header" onclick="headerClick()" style="cursor:pointer;">
         <h1>PrivaTube</h1>
         <h5>by YoutubeSwapper</h5>
     </header>
@@ -31,6 +33,25 @@
               <img src="web/icons/search-96.svg" alt="Search" style="width:24px;height:24px;">
             </button>
         </div>
+    </div>
+    <div id="video-player-wrapper">
+        <div id="video"></div>
+        <div id="video-info">
+            <h2 id="video-title" class="video-title"></h2>
+            <div id="video-channel" class="video-channel">
+                <img id="channel-avatar" class="channel-avatar" src="" alt="Channel Avatar">
+                <div class="channel-info">
+                    <span id="channel-name" class="channel-name"></span>
+                    <span id="channel-subscribers" class="channel-subscribers"></span>
+                </div>
+            </div>
+            <div id="video-stats">
+                <div class="stats-row"> 
+                    <span id="view-count" class="view-count"></span>
+                    <span id="like-count" class="like-count"></span>
+                </div>
+            <p id="video-description" class="video-description"></p>
+            </div>
     </div>
 
     <div id="channel-banner" style="display:none;"></div>
