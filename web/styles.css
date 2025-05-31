@@ -67,14 +67,16 @@ body.video-playing .search-bar-wrapper:hover {
   position: fixed;
   display: flex;
   justify-content: center;
-  top: 16px; /* Adjust as needed to fit between header and country selector */
-  left: 0;
-  right: 0;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
   margin-top: 0;
   margin-bottom: 0;
+  width: max-content;
+  min-width: 240px;
+  max-width: 90vw;
 }
-
 
 .search-container {
   display: flex;
@@ -147,12 +149,7 @@ body.video-playing .search-bar-wrapper:hover {
   background: rgba(220, 0, 0, 0.08);
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
-.channel-item img {
-  border-radius: 50%;
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-}
+
 
 /* --- Load More Button --- */
 #load-more-wrapper {
@@ -451,4 +448,99 @@ h1, h5 {
     border: none;
     display: block;
     z-index: 1;
+}
+
+#video-stats {
+  background: rgba(10, 10, 10, 0.92);
+  border-radius: 20px;
+  padding: 16px 0;
+  margin-left: 1vw;
+  margin-right: 1vw;
+  margin-top: 2vh;
+  margin-bottom: 0.25vh;
+  display: flex;
+  flex-direction: column;      /* stack children vertically */
+  color: #fff;
+  font-size: 1em;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  width: auto;
+  max-width: 98vw;
+}
+
+#video-stats .stats-row {
+  display: flex;
+  flex-direction: row;
+  gap: 1vw;
+  align-items: center;
+  width: 90%;
+  margin-bottom: 4px;
+}
+
+#video-stats .view-count,
+#video-stats .like-count {
+  margin-bottom: 1vh;
+  margin-left: 1vw;
+}
+#video-description {
+  margin-top: 8px;
+  margin-left: 1vw;
+  color: #ccc;
+  max-width: 90vw;
+  word-break: break-word;
+  font-size: 1.1em;
+}
+
+#video-description a {
+  color: #b0b0b0;
+  text-decoration: underline;
+  transition: color 0.2s;
+  word-break: break-all;
+}
+#video-description a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+
+.video-title {
+  color: #fff;
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 4px;
+  margin-left: 1vw;
+}
+
+#video-channel {
+  display: flex;
+  align-items: center;
+  margin-left: 1vw;
+  margin-top: 1vh;
+}
+
+.channel-avatar {
+  border-radius: 50%;
+  width: 5vw;
+  height: 5vw;
+  object-fit: cover;
+}
+
+.channel-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  margin-left: 0.5vw;
+}
+
+.channel-name {
+  font-weight: bold;
+  font-size: 1.1em;
+  text-align: left;
+}
+
+.channel-subscribers {
+  color: #bbb;
+  font-size: 0.95em;
+  margin-top: 0.5vh;
+  text-align: left;
 }

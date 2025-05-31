@@ -34,8 +34,25 @@
             </button>
         </div>
     </div>
-
-    <div id="video-player"></div>
+    <div id="video-player-wrapper">
+        <div id="video"></div>
+        <div id="video-info">
+            <h2 id="video-title" class="video-title"></h2>
+            <div id="video-channel" class="video-channel">
+                <img id="channel-avatar" class="channel-avatar" src="" alt="Channel Avatar">
+                <div class="channel-info">
+                    <span id="channel-name" class="channel-name"></span>
+                    <span id="channel-subscribers" class="channel-subscribers"></span>
+                </div>
+            </div>
+            <div id="video-stats">
+                <div class="stats-row"> 
+                    <span id="view-count" class="view-count"></span>
+                    <span id="like-count" class="like-count"></span>
+                </div>
+            <p id="video-description" class="video-description"></p>
+            </div>
+    </div>
 
     <div id="channel-banner" style="display:none;"></div>
 
