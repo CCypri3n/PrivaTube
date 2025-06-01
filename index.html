@@ -34,28 +34,6 @@
             </button>
         </div>
     </div>
-    <div id="video-player-wrapper">
-        <div id="video"></div>
-        <div id="video-info">
-            <h2 id="video-title" class="video-title"></h2>
-            <div id="video-channel" class="video-channel">
-                <img id="channel-avatar" class="channel-avatar" src="" alt="Channel Avatar">
-                <div class="channel-info">
-                    <span id="channel-name" class="channel-name"></span>
-                    <span id="channel-subscribers" class="channel-subscribers"></span>
-                </div>
-                <button id="share-btn" title="Share this video" style="margin-left:16px; background:transparent; border:none; cursor:pointer;">
-                    <img src="web/icons/share-96.svg" alt="Share" style="width:28px;height:28px">
-                </button>
-            </div>
-            <div id="video-stats">
-                <div class="stats-row"> 
-                    <span id="view-count" class="view-count"></span>
-                    <span id="like-count" class="like-count"></span>
-                </div>
-            <p id="video-description" class="video-description"></p>
-            </div>
-    </div>
 
     <div id="channel-banner" style="display:none;"></div>
 
@@ -71,7 +49,7 @@
     <div class="api-key-modal-content">
         <h2>Enter your YouTube API Key</h2>
         <div id="api-key-error" style="color:crimson; margin-bottom:10px; display:none;"></div>
-        <input type="text" id="api-key-input" placeholder="Paste your API key here">
+        <input type="password" id="api-key-input" placeholder="Paste your API key here">
         <button id="api-key-save-btn">Save</button>
         <p class="attention" style="margin-top:8px;">Your key is stored only in your browser.</p>
     </div>

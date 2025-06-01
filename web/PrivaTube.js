@@ -2,7 +2,6 @@ const BASE_URL = 'https://www.googleapis.com/youtube/v3/search';
 
 let nextPageToken = null;
 let currentMode = 'home'; // 'home', 'search', or 'channel'
-let lastQuery = '';
 let lastChannelId = '';
 let lastRegionCode = 'FR'; // for trending/homepage
 
@@ -42,52 +41,50 @@ async function filterOutShorts(videoItems) {
 }
 
 // --- API Key Modal Logic ---
-function promptForApiKey(errorMsg = "") {
-  const modal = document.getElementById('api-key-modal');
-  const errorDiv = document.getElementById('api-key-error');
-  if (errorMsg) {
-    errorDiv.textContent = errorMsg;
-    errorDiv.style.display = 'block';
-  } else {
-    errorDiv.textContent = "";
-    errorDiv.style.display = 'none';
+function fetchApiKey() {
+  const storedKey = localStorage.getItem('api_key');
+  if (storedKey) {
+    return Promise.resolve(storedKey.trim());
   }
-  modal.style.display = 'flex';
-  document.getElementById('api-key-input').focus();
 
-  document.getElementById('api-key-save-btn').onclick = async function() {
-    const api_key = document.getElementById('api-key-input').value.trim();
-    if (api_key) {
-      // Validate the API key by making a test request
+  return new Promise((resolve, reject) => {
+    // Show modal and set up event listener for save button
+    const modal = document.getElementById('api-key-modal');
+    const errorDiv = document.getElementById('api-key-error');
+    modal.style.display = 'flex';
+    document.getElementById('api-key-input').focus();
+
+    const onSave = async () => {
+      const api_key = document.getElementById('api-key-input').value.trim();
+      if (!api_key) {
+        errorDiv.textContent = "Please enter an API key.";
+        errorDiv.style.display = 'block';
+        return;
+      }
       try {
-        const testResp = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${api_key}`);
+        const testResp = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${api_key}`
+        );
         if (!testResp.ok) {
           errorDiv.textContent = "Invalid API Key. Please try again.";
           errorDiv.style.display = 'block';
           return;
         }
-        // Save only if valid
         localStorage.setItem('api_key', api_key);
         API_KEY = api_key;
         modal.style.display = 'none';
-        showHomepage(); // <-- Show homepage immediately, no reload
+        document.getElementById('api-key-save-btn').removeEventListener('click', onSave);
+        resolve(api_key);
       } catch (err) {
         errorDiv.textContent = "Network error. Please try again.";
         errorDiv.style.display = 'block';
       }
-    }
-  };
+    };
+
+    document.getElementById('api-key-save-btn').addEventListener('click', onSave);
+  });
 }
 
-async function fetchApiKey() {
-  API_KEY = localStorage.getItem('api_key') || '';
-  if (API_KEY) {
-    return API_KEY.trim();
-  } else {
-    promptForApiKey();
-    return null;
-  }
-}
 
 async function headerClick() {
   showHomepage();
@@ -99,6 +96,7 @@ async function showHomepage(loadMore = false) {
   const url = new URL(window.location);
   url.searchParams.delete('ch');
   url.searchParams.delete('v'); // Remove video param when going to homepage
+  url.searchParams.delete('q'); // Remove search param when going to homepage
   window.history.pushState({}, '', url);
   const params = new URLSearchParams(window.location.search);
   const lang = params.get('lang');
@@ -142,19 +140,31 @@ async function showHomepage(loadMore = false) {
 
 // --- Search Videos ---
 async function searchVideos(loadMore = false) {
-  document.getElementById('channel-banner').style.display = 'none';
   const url = new URL(window.location);
-  const query = decodeURIComponent(url.searchParams.get('q')) || document.getElementById('searchQuery').value.trim();
+  url.searchParams.delete('ch');
+  url.searchParams.delete('v'); // Remove video param when going to homepage
+  url.searchParams.delete('t'); // Remove time param when going to search
+  window.history.pushState({}, '', url);
+  document.getElementById('channel-banner').style.display = 'none';
+  const query = url.searchParams.get('q')
+  console.log("Search query from URL:", query);
+  if (!query) {
+    queryFromField = document.getElementById('searchQuery').value.trim();
+    console.log("Search query from field:", queryFromField);
+    url.searchParams.set('q', queryFromField);
+    window.history.replaceState({}, '', url);
+    query = url.searchParams.get('q');
+    console.log("Search query from URL:", query);
+  }
   if (!query.trim()) return;
   currentMode = 'search';
-  lastQuery = query;
   const resultsDiv = document.getElementById('results');
   if (!loadMore) {
     resultsDiv.innerHTML = "<p>Searching...</p>";
     nextPageToken = null;
   }
   try {
-    let url = `${BASE_URL}?part=snippet&q=${encodeURIComponent(query)}&type=video,channel&key=${API_KEY}&maxResults=24`;
+    let url = `${BASE_URL}?part=snippet&q=${query}&type=video,channel&key=${API_KEY}&maxResults=24`;
     if (nextPageToken) url += `&pageToken=${nextPageToken}`;
     const response = await fetch(url);
     const data = await response.json();
@@ -395,20 +405,14 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     lastRegionCode = code;
     const url = new URL(window.location);
     url.searchParams.set('lang', lastRegionCode);
-    window.history.pushState({}, '', url);
-
     // Go to the correct mode based on URL parameters
-    const videoId = url.searchParams.get('v');
-    if (url.searchParams.get('ch') && !videoId) {
-      fetchChannelVideos(url.searchParams.get('ch'));
-    } else if (!videoId) {
+    if (!url.searchParams.get('ch') && !url.searchParams.get('v') && !url.searchParams.get('q')) {
+      window.history.replaceState({}, '', url);
       showHomepage();
-    }
-    else {
-      playVideo(videoId);
-    }
+    } else {
+      window.history.pushState({}, '', url);
+  }});
   });
-});
 
   document.getElementById('load-more-btn').addEventListener('click', () => {
     if (currentMode === 'home') {
@@ -459,9 +463,13 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 async function playVideo(videoId) {
   window.scrollTo(0, 0);
   const url = new URL(window.location);
-  url.searchParams.set('v', videoId);
-  url.searchParams.delete('ch'); // Remove channel param when playing video
-  url.searchParams.delete('q'); // Remove search param when playing video
-  window.history.pushState({}, '', url);
-  window.location.href = "web/video.html?" + url.searchParams.toString();
+  const lang = url.searchParams.get('lang') || "FR";
+  let params = new URLSearchParams();
+  params.set('v', videoId);
+  params.set('lang', lang);
+  // Add t param if present
+  const t = url.searchParams.get('t');
+  if (t) params.set('t', t);
+  console.error("Playing video with params:", params.toString());
+  window.location.href = "video.html?" + params.toString();
 }

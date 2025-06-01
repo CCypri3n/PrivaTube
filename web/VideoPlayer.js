@@ -9,53 +9,50 @@ let lastRegionCode = 'FR'; // for trending/homepage
 let API_KEY = '';
 
 
-// --- API Key Modal Logic ---
-function promptForApiKey(errorMsg = "") {
-  const modal = document.getElementById('api-key-modal');
-  const errorDiv = document.getElementById('api-key-error');
-  if (errorMsg) {
-    errorDiv.textContent = errorMsg;
-    errorDiv.style.display = 'block';
-  } else {
-    errorDiv.textContent = "";
-    errorDiv.style.display = 'none';
+function fetchApiKey() {
+  const storedKey = localStorage.getItem('api_key');
+  if (storedKey) {
+    return Promise.resolve(storedKey.trim());
   }
-  modal.style.display = 'flex';
-  document.getElementById('api-key-input').focus();
 
-  document.getElementById('api-key-save-btn').onclick = async function() {
-    const api_key = document.getElementById('api-key-input').value.trim();
-    if (api_key) {
-      // Validate the API key by making a test request
+  return new Promise((resolve, reject) => {
+    // Show modal and set up event listener for save button
+    const modal = document.getElementById('api-key-modal');
+    const errorDiv = document.getElementById('api-key-error');
+    modal.style.display = 'flex';
+    document.getElementById('api-key-input').focus();
+
+    const onSave = async () => {
+      const api_key = document.getElementById('api-key-input').value.trim();
+      if (!api_key) {
+        errorDiv.textContent = "Please enter an API key.";
+        errorDiv.style.display = 'block';
+        return;
+      }
       try {
-        const testResp = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${api_key}`);
+        const testResp = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${api_key}`
+        );
         if (!testResp.ok) {
           errorDiv.textContent = "Invalid API Key. Please try again.";
           errorDiv.style.display = 'block';
           return;
         }
-        // Save only if valid
         localStorage.setItem('api_key', api_key);
         API_KEY = api_key;
         modal.style.display = 'none';
-        showHomepage(); // <-- Show homepage immediately, no reload
+        document.getElementById('api-key-save-btn').removeEventListener('click', onSave);
+        resolve(api_key);
       } catch (err) {
         errorDiv.textContent = "Network error. Please try again.";
         errorDiv.style.display = 'block';
       }
-    }
-  };
+    };
+
+    document.getElementById('api-key-save-btn').addEventListener('click', onSave);
+  });
 }
 
-async function fetchApiKey() {
-  API_KEY = localStorage.getItem('api_key') || '';
-  if (API_KEY) {
-    return API_KEY.trim();
-  } else {
-    promptForApiKey();
-    return null;
-  }
-}
 
 async function headerClick() {
   closePlayer();
@@ -68,12 +65,10 @@ async function showHomepage() {
     url.searchParams.delete('ch');
     url.searchParams.delete('v');
     url.searchParams.delete('t');
+    url.searchParams.delete('q');
     const lang = url.searchParams.get('lang');
     if (!lang) {
-        lastRegionCode = 'FR';
-        const url = new URL(window.location);
-        url.searchParams.set('lang', lastRegionCode);
-        window.history.replaceState({}, '', url); // Use replaceState to avoid history spam
+        url.searchParams.set('lang', 'FR'); // Default to 'FR' if no lang param
         // Open URL in same tab
         window.location.href = "index.html?" + url.searchParams.toString();
     } else {
@@ -81,26 +76,45 @@ async function showHomepage() {
     }
     // Set the region code in the button
     // Open URL in same tab
-  window.location.href = "index.html?" + url.searchParams.toString();
-    }
+    window.location.href = "index.html?" + url.searchParams.toString();
+}
 
 
 async function searchVideos(query) {
     // Implement search logic with search args in URL
-    pass
+    closePlayer();
+    const url = new URL(window.location);
+    url.searchParams.delete('v');
+    url.searchParams.delete('t');
+    url.searchParams.delete('ch');
+    queryFromField = document.getElementById('searchQuery').value.trim();
+    console.log("Search query from field:", queryFromField);
+    url.searchParams.set('q', queryFromField);
+    window.location.href = "index.html?" + url.searchParams.toString();
 }
 
 
-async function fetchChannelVideos(channelId, loadMore = false) {
-    // Implement channel video fetching logic (URL)
-    pass
-  }
+async function fetchChannelVideos(channelId) {
+    // GO TO index.html with updated URL
+    closePlayer();
+    const url = new URL(window.location);
+    url.searchParams.delete('v');
+    url.searchParams.delete('t');
+    url.searchParams.delete('q');
+    url.searchParams.set('ch', channelId);
+    window.location.href = "index.html?" + url.searchParams.toString();
+}
 
 document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed on page load
   const input = document.getElementById('searchQuery');
   const btn = document.getElementById('country-code-btn');
   const list = document.getElementById('country-list');
   const dropdown = document.getElementById('country-dropdown');
+
+  closePlayer(); // Close player on page load
+    if (input) {
+        input.value = ''; // Clear search input
+    }
 
   input.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
@@ -141,22 +155,16 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     lastRegionCode = code;
     const url = new URL(window.location);
     url.searchParams.set('lang', lastRegionCode);
-    window.history.pushState({}, '', url);
-    showHomepage();
+    window.history.replaceState({}, '', url);
     });
  });
-
-  // Only start app after API key is loaded!
-  if (!videoId) {
-    closePlayer();
-  }
   
   fetchApiKey().then(key => {
-  if (key) {
+  if (key && videoId) {
     API_KEY = key;
     playVideo(videoId)
   } else {
-    showHomepage();
+    closePlayer();
     }
   // If key is missing/invalid, promptForApiKey() is already called inside fetchApiKey()
   }).catch(err => {
@@ -299,10 +307,11 @@ async function playVideo(videoId) {
   document.body.classList.add('video-playing');
   const url = new URL(window.location);
   url.searchParams.delete('ch');
+  url.searchParams.delete('q');
   url.searchParams.set('v', videoId);
   const time = url.searchParams.get('t');
   // Use pushState to update URL without reloading
-  window.history.pushState({}, '', url);
+  window.history.replaceState({}, '', url);
   let videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
   if (time && !isNaN(Number(time))) {
     videoUrl += `?start=${Number(time)}`;
@@ -339,7 +348,4 @@ function closePlayer() {
   if (bannerDiv) bannerDiv.style.display = '';
   if (videoInfoDiv) videoInfoDiv.style.display = 'none'; // <-- Hide info
   videoInfoShow(false);
-  const url = new URL(window.location);
-  url.searchParams.delete('v');
-  window.history.pushState({}, '', url);
 }
