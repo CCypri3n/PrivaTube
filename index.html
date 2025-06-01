@@ -44,6 +44,9 @@
                     <span id="channel-name" class="channel-name"></span>
                     <span id="channel-subscribers" class="channel-subscribers"></span>
                 </div>
+                <button id="share-btn" title="Share this video" style="margin-left:16px; background:transparent; border:none; cursor:pointer;">
+                    <img src="web/icons/share-96.svg" alt="Share" style="width:28px;height:28px">
+                </button>
             </div>
             <div id="video-stats">
                 <div class="stats-row"> 
@@ -71,6 +74,19 @@
         <input type="text" id="api-key-input" placeholder="Paste your API key here">
         <button id="api-key-save-btn">Save</button>
         <p class="attention" style="margin-top:8px;">Your key is stored only in your browser.</p>
+    </div>
+    </div>
+
+    <div id="share-modal" style="display:none;">
+    <div class="api-key-modal-backdrop"></div>
+    <div class="api-key-modal-content">
+        <h2>Share this video</h2>
+        <div class="share-link-row">
+            <input id="share-link" type="text" readonly>
+            <button id="copy-share-link-btn" title="Copy link">Copy</button>
+        </div>
+        <button id="share-close-btn" class="button" style="margin-top:12px;">Close</button>
+        <p class="attention" style="margin-top:8px;">Copy and share this link.</p>
     </div>
     </div>
 

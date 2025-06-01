@@ -290,6 +290,7 @@ h1, h5 {
   margin: 0 auto 32px auto;
   position: relative;
   z-index: 2;
+  margin-top: 12vh;
 }
 
 .channel-banner-inner {
@@ -390,7 +391,8 @@ h1, h5 {
   font-size: 1em;
 }
 
-#api-key-modal {
+#api-key-modal,
+#share-modal {
   position: fixed;
   z-index: 10000;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -438,6 +440,48 @@ h1, h5 {
 }
 #api-key-save-btn:hover {
   background: #b8002f;
+}
+
+.share-link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+#share-link {
+  width: 320px;
+  max-width: 70vw;
+  background: #181818;
+  color: #f4f4f4;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 1.05em;
+  text-align: center;
+  outline: none;
+  transition: border 0.2s;
+}
+
+#share-link:focus {
+  border: 1.5px solid crimson;
+}
+
+#copy-share-link-btn {
+  background: #333;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#copy-share-link-btn:hover {
+  background: crimson;
 }
 
 /* Video Player Styles */

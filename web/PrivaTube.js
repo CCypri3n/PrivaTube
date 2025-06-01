@@ -97,6 +97,20 @@ async function headerClick() {
 // --- Homepage Trending Videos ---
 async function showHomepage(loadMore = false) {
   currentMode = 'home';
+  const url = new URL(window.location);
+  url.searchParams.delete('ch');
+  url.searchParams.delete('v'); // Remove video param when going to homepage
+  window.history.pushState({}, '', url);
+  const params = new URLSearchParams(window.location.search);
+  const lang = params.get('lang');
+  if (!lang) {
+    lastRegionCode = 'FR';
+    const url = new URL(window.location);
+    url.searchParams.set('lang', lastRegionCode);
+    window.history.replaceState({}, '', url); // Use replaceState to avoid history spam
+  } else {
+    lastRegionCode = lang;
+  }
   const resultsDiv = document.getElementById('results');
   if (!loadMore) {
     resultsDiv.innerHTML = "<p>Loading trending videos...</p>";
@@ -180,8 +194,13 @@ async function searchVideos(loadMore = false) {
 
 async function fetchChannelVideos(channelId, loadMore = false) {
   closePlayer();
+  window.scrollTo(0, 0);
   currentMode = 'channel';
   lastChannelId = channelId;
+  const url = new URL(window.location);
+  url.searchParams.set('ch', channelId);
+  url.searchParams.delete('v'); // Remove video param when going to channel
+  window.history.pushState({}, '', url);
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
   if (!loadMore) {
@@ -355,18 +374,37 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     btn.classList.remove('active');
   });
 
+  const params = new URLSearchParams(window.location.search);
+  const lang = params.get('lang');
+  if (lang) {
+    lastRegionCode = lang;
+  }
+  // Update the button display
+  if (btn) {
+    btn.innerHTML = `${lastRegionCode} ▼`;
+  }
+
   // Handle country selection
   list.querySelectorAll('div').forEach(item => {
-    item.addEventListener('click', (e) => {
-      const code = item.getAttribute('data-code');
-      btn.innerHTML = `${code} ▼`;
-      list.style.display = 'none';
-      btn.classList.remove('active');
-      // Set the global region code and refresh homepage
-      lastRegionCode = code;
+  item.addEventListener('click', (e) => {
+    const code = item.getAttribute('data-code');
+    btn.innerHTML = `${code} ▼`;
+    list.style.display = 'none';
+    btn.classList.remove('active');
+    lastRegionCode = code;
+    const url = new URL(window.location);
+    url.searchParams.set('lang', lastRegionCode);
+    window.history.pushState({}, '', url);
+
+    // If a video is playing, reload it with the new region
+    const videoId = url.searchParams.get('v');
+    if (url.searchParams.get('ch') && !videoId) {
+      fetchChannelVideos(url.searchParams.get('ch'));
+    } else if (!videoId) {
       showHomepage();
-    });
+    }
   });
+});
 
   document.getElementById('load-more-btn').addEventListener('click', () => {
     if (currentMode === 'home') {
@@ -379,15 +417,19 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   });
 
   // Only start app after API key is loaded!
-  const params = new URLSearchParams(window.location.search);
   const videoId = params.get('v');
+  const channel = params.get('ch');
   if (!videoId) {
   closePlayer();
   }
   fetchApiKey().then(key => {
   if (key) {
     API_KEY = key;
-    if (videoId) {
+    if (channel) {
+    lastChannelId = channel;
+    currentMode = 'channel';
+    fetchChannelVideos(lastChannelId);
+    } else if (videoId) {
       playVideo(videoId);
     }
     else {
@@ -406,6 +448,39 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
       searchVideos();
     });
   }
+
+  const shareBtn = document.getElementById('share-btn');
+  const shareModal = document.getElementById('share-modal');
+  const shareLink = document.getElementById('share-link');
+  const shareCloseBtn = document.getElementById('share-close-btn');
+
+  if (shareBtn && shareModal && shareLink && shareCloseBtn) {
+    shareBtn.onclick = function() {
+      if (!lastPlayedVideoId) return;
+      const shareUrl = `https://ccypri3n.github.io/PrivaTube/?v=${lastPlayedVideoId}`;
+      shareLink.value = shareUrl;
+      shareModal.style.display = 'flex';
+      shareLink.select();
+    };
+    shareCloseBtn.onclick = function() {
+      shareModal.style.display = 'none';
+    };
+    // Optional: close modal when clicking backdrop
+    shareModal.querySelector('.api-key-modal-backdrop').onclick = function() {
+      shareModal.style.display = 'none';
+    };
+  }
+
+  const copyBtn = document.getElementById('copy-share-link-btn');
+  if (copyBtn && shareLink) {
+    copyBtn.onclick = function() {
+      shareLink.select();
+      document.execCommand('copy');
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1200);
+    };
+  }
+
 });
 
 function linkify(text) {
@@ -492,10 +567,23 @@ async function videoInfoShow(videoId) {
   }
 }
 
+let lastPlayedVideoId = null;
+
 
 async function playVideo(videoId) {
+  window.scrollTo(0, 0);
+  lastPlayedVideoId = videoId; // Track for sharing
   document.body.classList.add('video-playing');
-  const videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  const url = new URL(window.location);
+  url.searchParams.delete('ch');
+  url.searchParams.set('v', videoId);
+  const time = url.searchParams.get('t');
+  // Use pushState to update URL without reloading
+  window.history.pushState({}, '', url);
+  let videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  if (time && !isNaN(Number(time))) {
+    videoUrl += `?start=${Number(time)}`;
+  }
   const playerDiv = document.getElementById('video');
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
@@ -514,9 +602,7 @@ async function playVideo(videoId) {
   if (videoInfoDiv) videoInfoDiv.style.display = 'block'; // <-- Show info
   toggleLoadMoreButton(false);
   videoInfoShow(videoId);
-  const url = new URL(window.location);
-  url.searchParams.set('v', videoId);
-  window.history.replaceState({}, '', url);
+  
 }
 
 function closePlayer() {
@@ -533,5 +619,49 @@ function closePlayer() {
   videoInfoShow(false);
   const url = new URL(window.location);
   url.searchParams.delete('v');
-  window.history.replaceState({}, '', url);
+  window.history.pushState({}, '', url);
 }
+
+window.addEventListener('popstate', (event) => {
+  const params = new URLSearchParams(window.location.search);
+  const videoId = params.get('v');
+  const lang = params.get('lang');
+  const channel = params.get('ch');
+  if (lang) {
+    lastRegionCode = lang;
+    const btn = document.getElementById('country-code-btn');
+    if (btn) {
+      btn.innerHTML = `${lastRegionCode} ▼`;
+    }
+  }
+  if (channel) {
+    lastChannelId = channel;
+    currentMode = 'channel';
+    fetchChannelVideos(lastChannelId)
+  }
+  if (videoId === lastPlayedVideoId) {
+    // If the same video is requested, just show it
+    playVideo(videoId);
+  } else if (videoId && videoId !== lastPlayedVideoId) {
+    // If a different video is requested, close player and show new video
+    closePlayer();
+    playVideo(videoId);
+  } else if (currentMode === 'channel' && lastChannelId) {
+    // If we were in channel mode, reload channel videos
+    fetchChannelVideos(lastChannelId);
+  } else if (currentMode === 'search' && lastQuery) {
+    // If we were in search mode, reload search results
+    searchVideos();
+  } else if (currentMode === 'home') {
+    // If we were on homepage, reload trending videos
+    showHomepage();
+  } else if (lang) {
+    // If we have a region code but no video/channel, show homepage
+    showHomepage();
+  } else if (videoId) {
+    playVideo(videoId);
+  } else {
+    closePlayer();
+    showHomepage();
+  }
+});
