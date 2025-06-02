@@ -206,10 +206,16 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
 function linkify(text) {
   // Regex to match URLs (http/https)
-  return text.replace(
+  text = text.replace(
     /(https?:\/\/[^\s]+)/g,
     '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
   );
+    // 2. Linkify local .html links with optional query parameters
+  text = text.replace(
+    /\b([a-zA-Z0-9_-]+\.html(?:\?[^\s]*)?)/g,
+    '<a href="$1">$1</a>'
+  );
+  return text;
 }
 
 // --- Video Player Logic ---
@@ -224,7 +230,7 @@ async function videoInfoShow(videoId) {
       if (data.items && data.items.length > 0) {
         video = data.items[0];
         document.getElementById('video-title').textContent = video.snippet.title;
-        document.getElementById('video-description').innerHTML = linkify(video.snippet.description);
+        document.getElementById('video-description').innerHTML = youtubeDescriptiontoPrivaTube(video.snippet.description);
         document.getElementById('view-count').textContent = `${Number(video.statistics.viewCount).toLocaleString()} views`;
         document.getElementById('like-count').textContent = `${video.statistics.likeCount ? Number(video.statistics.likeCount).toLocaleString()+" likes": ''}`;
       } else {
@@ -350,4 +356,33 @@ function createChannelUrl(channelId) {
   console.log("Channel URL with params:", params.toString());
   channelUrl = "index.html?" + params.toString();
   return(channelUrl);
+}
+
+function youtubeDescriptiontoPrivaTube(description) {
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  if (!description) return '';
+  // Remove excessive whitespace
+  description = description.replace(/\s+/g, ' ').trim();
+    // Regex to match YouTube video URLs (both with and without "www.")
+  const ytUrlRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/g;
+
+  // Replace each YouTube video URL with your custom format
+  description = description.replace(ytUrlRegex, (match, videoId) => {
+    return `video.html?v=${videoId}`;
+  });
+
+  // If you want to also match youtu.be short links:
+  const ytShortUrlRegex = /https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})/g;
+  description = description.replace(ytShortUrlRegex, (match, videoId) => {
+    return `video.html?v=${videoId}`;
+  });
+
+  // Replace YouTube channel URLs with channel ID (not handle)
+  // Channel IDs are 24 characters, start with UC, and contain letters, numbers, -, _
+  description = description.replace(
+    /https?:\/\/(?:www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/g,
+    'index.html?ch=$1'
+  );
+
+  return linkify(description);
 }
