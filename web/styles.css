@@ -588,3 +588,16 @@ h1, h5 {
   margin-top: 0.5vh;
   text-align: left;
 }
+
+#channel-link {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+}
+#channel-link:hover {
+  text-decoration: none; /* or keep none if you don't want underline */
+}
+.channel-avatar {
+  margin-right: 10px;
+}

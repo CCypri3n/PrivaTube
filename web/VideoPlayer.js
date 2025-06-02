@@ -94,22 +94,12 @@ async function searchVideos(query) {
 }
 
 
-async function fetchChannelVideos(channelId) {
-    // GO TO index.html with updated URL
-    closePlayer();
-    const url = new URL(window.location);
-    url.searchParams.delete('v');
-    url.searchParams.delete('t');
-    url.searchParams.delete('q');
-    url.searchParams.set('ch', channelId);
-    window.location.href = "index.html?" + url.searchParams.toString();
-}
-
 document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed on page load
   const input = document.getElementById('searchQuery');
   const btn = document.getElementById('country-code-btn');
   const list = document.getElementById('country-list');
   const dropdown = document.getElementById('country-dropdown');
+  const mainHeader = document.getElementById('main-header-link');
 
   closePlayer(); // Close player on page load
     if (input) {
@@ -139,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const videoId = params.get('v');
   if (lang) {
     lastRegionCode = lang;
-  }
+  } mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
   // Update the button display
   if (btn) {
     btn.innerHTML = `${lastRegionCode} ▼`;
@@ -156,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     const url = new URL(window.location);
     url.searchParams.set('lang', lastRegionCode);
     window.history.replaceState({}, '', url);
+    mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
     });
  });
   
@@ -258,12 +249,11 @@ async function videoInfoShow(videoId) {
           // After fetching channel info:
           document.getElementById('channel-name').textContent = channel.snippet.title;
           document.getElementById('channel-name').style.cursor = "pointer";
-          document.getElementById('channel-name').onclick = () => fetchChannelVideos(channelID);
 
           document.getElementById('channel-avatar').src = channel.snippet.thumbnails.default.url;
           document.getElementById('channel-avatar').alt = channel.snippet.title;
           document.getElementById('channel-avatar').style.cursor = "pointer";
-          document.getElementById('channel-avatar').onclick = () => fetchChannelVideos(channelID);
+          document.getElementById('channel-link').href = createChannelUrl(channelID);
           document.getElementById('channel-subscribers').textContent =
             channel.statistics.subscriberCount
               ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
@@ -349,4 +339,15 @@ function closePlayer() {
   if (bannerDiv) bannerDiv.style.display = '';
   if (videoInfoDiv) videoInfoDiv.style.display = 'none'; // <-- Hide info
   videoInfoShow(false);
+}
+
+function createChannelUrl(channelId) {
+  const url = new URL(window.location);
+  const lang = url.searchParams.get('lang') || "FR";
+  let params = new URLSearchParams();
+  params.set('ch', channelId);
+  params.set('lang', lang);
+  console.log("Channel URL with params:", params.toString());
+  channelUrl = "index.html?" + params.toString();
+  return(channelUrl);
 }

@@ -197,6 +197,7 @@ async function searchVideos(loadMore = false) {
     toggleLoadMoreButton(false);
     console.error('Error:', error);
   }
+  document.title = `PrivaTube - Browsing...`;
 }
 
 // --- Fetch Channel Videos ---
@@ -226,10 +227,11 @@ async function fetchChannelVideos(channelId, loadMore = false) {
         const channel = channelInfoData.items[0];
         const bannerUrl = channel.brandingSettings?.image?.bannerExternalUrl;
         const channelName = channel.snippet?.title || '';
+        document.title = `PrivaTube - Checking out "${channel.snippet.title}"`;
         bannerDiv.style.display = 'block';
         bannerDiv.innerHTML = `
             <div class="channel-banner-inner">
-            ${bannerUrl ? `<img class="channel-banner-img" src="${bannerUrl}" alt="Channel Banner">` : ''}
+            ${bannerUrl ? `<img class="channel-banner-img" src="${bannerUrl}" alt="">` : ''}
             <div class="channel-banner-title">${channelName}</div>
             </div>
         `;
@@ -371,6 +373,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const btn = document.getElementById('country-code-btn');
   const list = document.getElementById('country-list');
   const dropdown = document.getElementById('country-dropdown');
+  const mainHeader = document.getElementById('main-header-link');
+  document.title = `PrivaTube`;
 
 
   input.addEventListener('keydown', function(event) {
@@ -381,6 +385,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
       searchVideos();
     }
   });
+
+
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -398,7 +404,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const lang = params.get('lang');
   if (lang) {
     lastRegionCode = lang;
-  }
+  } mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
+  document.title = `PrivaTube - ${lastRegionCode}`;
   // Update the button display
   if (btn) {
     btn.innerHTML = `${lastRegionCode} ▼`;
@@ -414,6 +421,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     lastRegionCode = code;
     const url = new URL(window.location);
     url.searchParams.set('lang', lastRegionCode);
+    mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
+    document.title = `PrivaTube - ${lastRegionCode}`;
     // Go to the correct mode based on URL parameters
     if (!url.searchParams.get('ch') && !url.searchParams.get('v') && !url.searchParams.get('q')) {
       window.history.replaceState({}, '', url);
@@ -452,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     } else if (query) {
       searchVideos(false)
     } else if (channel) {
-      fetchChannelVideos(lastChannelId);
+      fetchChannelVideos(channel);
     } else {
     showHomepage();
     }
