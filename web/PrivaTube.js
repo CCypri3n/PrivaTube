@@ -242,7 +242,6 @@ async function fetchChannelVideos(channelId, loadMore = false) {
     }
   }
 
-  // ... rest of your code for fetching and displaying channel videos ...
   try {
     // Get uploads playlist ID (only on first load or if channel changed)
     let uploadsPlaylistId = fetchChannelVideos.uploadsPlaylistId;
@@ -251,6 +250,11 @@ async function fetchChannelVideos(channelId, loadMore = false) {
         `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${API_KEY}`
       );
       const channelData = await channelResp.json();
+      if (!channelData.items || !channelData.items.length) {
+        resultsDiv.innerHTML = '<p>Channel not found.</p>';
+        toggleLoadMoreButton(false);
+        return;
+      }
       uploadsPlaylistId = channelData.items[0].contentDetails.relatedPlaylists.uploads;
       fetchChannelVideos.uploadsPlaylistId = uploadsPlaylistId;
       fetchChannelVideos.lastChannelId = channelId;
@@ -319,30 +323,35 @@ function renderResultItem(item, channelStats = {}) {
     const dateStr = item.snippet.publishedAt
       ? new Date(item.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
       : '';
+    const videoUrl = createVideoUrl(item.id.videoId);
+    const channelUrl = createChannelUrl(item.snippet.channelId);
     return `
         <div class="video-item">
-            <a href="#" onclick="playVideo('${item.id.videoId}'); return false;">
+            <a href="${videoUrl}" target="_self">
               <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
             </a>
             <h3>${item.snippet.title}</h3>
             <div class="video-meta">
             <span class="video-date">${dateStr}</span>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
-            <a href="#" class="channel-link" onclick="fetchChannelVideos('${item.snippet.channelId}'); return false;">
+            <a href="${channelUrl}" class="channel-link" target="_self">
                 ${item.snippet.channelTitle}
             </a>
             </div>
         </div>
-        `;
+        `
   } else if (item.id.kind === "youtube#channel") {
     const subs = channelStats[item.id.channelId];
+    const channelUrl = createChannelUrl(item.id.channelId);
     return `
+    <a href="${channelUrl}" target="_self">
       <div class="channel-item" data-channel-id="${item.id.channelId}" onclick="fetchChannelVideos('${item.id.channelId}')">
         <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
         <h3>${item.snippet.title}</h3>
         <p class="attention">Click to view channel videos</p>
         <p class="subs">${subs ? `${Number(subs).toLocaleString()} subscribers` : ''}</p>
       </div>
+    </a>
     `;
   } else {
     return '';
@@ -411,6 +420,13 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
       showHomepage();
     } else {
       window.history.pushState({}, '', url);
+      if (url.searchParams.get('v')) {
+        playVideo(url.searchParams.get('v'));
+      } else if (url.searchParams.get('q')) {
+        searchVideos();
+      } else if (url.searchParams.get('ch')) {
+        fetchChannelVideos(url.searchParams.get('ch'));
+      }
   }});
   });
 
@@ -436,7 +452,6 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     } else if (query) {
       searchVideos(false)
     } else if (channel) {
-      currentMode = 'channel';
       fetchChannelVideos(lastChannelId);
     } else {
     showHomepage();
@@ -470,6 +485,30 @@ async function playVideo(videoId) {
   // Add t param if present
   const t = url.searchParams.get('t');
   if (t) params.set('t', t);
-  console.error("Playing video with params:", params.toString());
   window.location.href = "video.html?" + params.toString();
+}
+
+function createVideoUrl(videoId) {
+  const url = new URL(window.location);
+  const lang = url.searchParams.get('lang') || "FR";
+  let params = new URLSearchParams();
+  params.set('v', videoId);
+  params.set('lang', lang);
+  // Add t param if present
+  const t = url.searchParams.get('t');
+  if (t) params.set('t', t);
+  console.log("Video URL with params:", params.toString());
+  videoUrl = "video.html?" + params.toString();
+  return(videoUrl);
+}
+
+function createChannelUrl(channelId) {
+  const url = new URL(window.location);
+  const lang = url.searchParams.get('lang') || "FR";
+  let params = new URLSearchParams();
+  params.set('ch', channelId);
+  params.set('lang', lang);
+  console.log("Channel URL with params:", params.toString());
+  channelUrl = "index.html?" + params.toString();
+  return(channelUrl);
 }

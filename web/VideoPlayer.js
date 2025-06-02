@@ -268,6 +268,7 @@ async function videoInfoShow(videoId) {
             channel.statistics.subscriberCount
               ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
               : '';
+          document.title = `PrivaTube - Watching "${channel.snippet.title}"`;
         }
       } catch (err) {
         console.error("Error fetching channel info:", err);
