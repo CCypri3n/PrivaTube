@@ -389,6 +389,38 @@ function youtubeDescriptiontoPrivaTube(description) {
   return linkify(description);
 }
 
+function youtubeCommentPrivaTube(comment) {
+  if (!comment) return '';
+
+  // Remove excessive whitespace
+  comment = comment.replace(/\s+/g, ' ').trim();
+
+  // 1. Replace YouTube video URLs (with optional &t= and other params)
+  // Example: https://www.youtube.com/watch?v=abcdefghijk&t=123s&ab_channel=Test
+  const ytUrlRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})(&[^\s]*)?/g;
+  comment = comment.replace(ytUrlRegex, (match, videoId, params) => {
+    return `video.html?v=${videoId}${params ? params : ''}`;
+  });
+
+  // 2. Replace youtu.be short links (with optional ?t= and other params)
+  // Example: https://youtu.be/abcdefghijk?t=123
+  const ytShortUrlRegex = /https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(\?[^\s]*)?/g;
+  comment = comment.replace(ytShortUrlRegex, (match, videoId, params) => {
+    return `video.html?v=${videoId}${params ? params : ''}`;
+  });
+
+  // 3. Replace YouTube channel URLs with channel ID (not handle)
+  // Example: https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx
+  comment = comment.replace(
+    /https?:\/\/(?:www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/g,
+    'index.html?ch=$1'
+  );
+
+  return comment;
+}
+
+
+
 function displayComments(videoId) {
   const commentWrapper = document.getElementById('comment-wrapper');
   if (!commentWrapper) {
@@ -411,10 +443,19 @@ function displayComments(videoId) {
           // Example: inside your displayComments function
           const commentDiv = document.createElement('div');
           const channelUrl = createChannelUrl(comment.authorChannelId.value)
+          const rawText = comment.textDisplay || comment.textOriginal || '';
+          if (!rawText) {
+            console.warn("Comment text is empty, skipping:", comment);
+            return; // Skip empty comments
+          }
+          else {
+            text = youtubeCommentPrivaTube(rawText);
+          }
+          // Create comment element
           commentDiv.className = 'comment';
           commentDiv.innerHTML = `
-            <a href="${channelUrl}" class="comment-avatar-link"><label class="comment-avatar">
-              <img src="${comment.authorProfileImageUrl}" alt="" class="comment-avatar">
+            <a href="${channelUrl}" class="comment-avatar-link">
+              <img src="${comment.authorProfileImageUrl}" alt="  " class="comment-avatar">
             </a>
             <div class="comment-main">
               <div class="comment-header">
@@ -426,7 +467,7 @@ function displayComments(videoId) {
                 })
               }</span>
               </div>
-              <div class="comment-text">${comment.textDisplay}</div>
+              <div class="comment-text">${text}</div>
             </div>
           `;
           commentWrapper.appendChild(commentDiv);
