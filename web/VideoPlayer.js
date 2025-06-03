@@ -265,6 +265,8 @@ async function videoInfoShow(videoId) {
               ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
               : '';
           document.title = `PrivaTube - Watching "${channel.snippet.title}"`;
+          displayComments(videoId); // Load comments for the video
+          console.log("Channel info fetched successfully:", channel);
         }
       } catch (err) {
         console.error("Error fetching channel info:", err);
@@ -385,4 +387,56 @@ function youtubeDescriptiontoPrivaTube(description) {
   );
 
   return linkify(description);
+}
+
+function displayComments(videoId) {
+  const commentWrapper = document.getElementById('comment-wrapper');
+  if (!commentWrapper) {
+    console.error('No comment element found in html:', commentWrapper);
+    return;
+  }
+
+  commentWrapper.innerHTML = ''; // Clear previous comments
+  if (!videoId) {
+    commentWrapper.textContent = 'No video selected.';
+    return;
+  }
+
+  fetch(`https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.items && data.items.length > 0) {
+        data.items.forEach(item => {
+          const comment = item.snippet.topLevelComment.snippet;
+          // Example: inside your displayComments function
+          const commentDiv = document.createElement('div');
+          const channelUrl = createChannelUrl(comment.authorChannelId.value)
+          commentDiv.className = 'comment';
+          commentDiv.innerHTML = `
+            <a href="${channelUrl}" class="comment-avatar-link"><label class="comment-avatar">
+              <img src="${comment.authorProfileImageUrl}" alt="" class="comment-avatar">
+            </a>
+            <div class="comment-main">
+              <div class="comment-header">
+              ${comment.authorChannelId ? `<a href="${channelUrl}" class="comment-author-link"><label class="comment-author">${comment.authorDisplayName}</label></a>` : `<strong class="comment-author">${comment.authorDisplayName}</strong>`}
+                <span class="comment-date">${
+                new Date(comment.publishedAt).toLocaleString(undefined, {
+                  day: '2-digit', month: '2-digit', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit'
+                })
+              }</span>
+              </div>
+              <div class="comment-text">${comment.textDisplay}</div>
+            </div>
+          `;
+          commentWrapper.appendChild(commentDiv);
+        });
+      } else {
+        commentsDiv.textContent = 'No comments available.';
+      }
+    })
+    .catch(err => {
+      console.error("Error fetching comments:", err);
+      commentsDiv.textContent = 'Error loading comments.';
+    });
 }
