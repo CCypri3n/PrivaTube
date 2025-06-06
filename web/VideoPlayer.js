@@ -5,6 +5,7 @@ let currentMode = 'home'; // 'home', 'search', or 'channel'
 let lastQuery = '';
 let lastChannelId = '';
 let lastRegionCode = 'FR'; // for trending/homepage
+let currentCommentsVideoId = null;
 
 let API_KEY = '';
 
@@ -265,6 +266,7 @@ async function videoInfoShow(videoId) {
               ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
               : '';
           document.title = `PrivaTube - Watching "${channel.snippet.title}"`;
+          currentCommentsVideoId = videoId;
           displayComments(videoId); // Load comments for the video
           console.log("Channel info fetched successfully:", channel);
         }
@@ -419,22 +421,21 @@ function youtubeCommentPrivaTube(comment) {
   return comment;
 }
 
-
-
-function displayComments(videoId) {
+function displayComments(videoId, pageToken = null, append = false) {
   const commentWrapper = document.getElementById('comment-wrapper');
   if (!commentWrapper) {
     console.error('No comment element found in html:', commentWrapper);
     return;
   }
 
-  commentWrapper.innerHTML = ''; // Clear previous comments
+  if (!append) commentWrapper.innerHTML = ''; // Clear previous comments
   if (!videoId) {
     commentWrapper.textContent = 'No video selected.';
     return;
   }
-
-  fetch(`https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}`)
+  let apiUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}`;
+  if (pageToken) apiUrl += `&pageToken=${pageToken}`;
+  fetch(apiUrl)
     .then(response => response.json())
     .then(data => {
       if (data.items && data.items.length > 0) {
@@ -452,10 +453,12 @@ function displayComments(videoId) {
             text = youtubeCommentPrivaTube(rawText);
           }
           // Create comment element
+          const likeCount = comment.likeCount ? Number(comment.likeCount).toLocaleString() : '';
           commentDiv.className = 'comment';
           commentDiv.innerHTML = `
             <a href="${channelUrl}" class="comment-avatar-link">
-              <img src="${comment.authorProfileImageUrl}" alt="  " class="comment-avatar">
+              <img src="${comment.authorProfileImageUrl}" alt=" " class="comment-avatar"
+                onerror="this.onerror=null;this.src='web/icons/unavailableAvatar-96.svg';">
             </a>
             <div class="comment-main">
               <div class="comment-header">
@@ -468,10 +471,21 @@ function displayComments(videoId) {
               }</span>
               </div>
               <div class="comment-text">${text}</div>
+               <div class="comment-likes">
+                  ${likeCount ? `<img src="web/icons/like-96.svg" alt="Likes" class="comment-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">${likeCount}` : ''}
+                </div>
             </div>
           `;
           commentWrapper.appendChild(commentDiv);
         });
+         // Show "Load More" button if there are more comments
+        if (data.nextPageToken) {
+          nextPageToken = data.nextPageToken;
+          toggleLoadMoreButton(true);
+        } else {
+          nextPageToken = null;
+          toggleLoadMoreButton(false);
+        }
       } else {
         commentsDiv.textContent = 'No comments available.';
       }
@@ -480,4 +494,14 @@ function displayComments(videoId) {
       console.error("Error fetching comments:", err);
       commentsDiv.textContent = 'Error loading comments.';
     });
+}
+
+document.getElementById('load-more-btn').onclick = function() {
+  if (currentCommentsVideoId && nextPageToken) {
+    displayComments(currentCommentsVideoId, nextPageToken, true);
+  }
+};
+
+function toggleLoadMoreButton(show) {
+  document.getElementById('load-more-btn').style.display = show ? 'block' : 'none';
 }
