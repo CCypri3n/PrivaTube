@@ -42,22 +42,25 @@
         <div id="video-info">
             <h2 id="video-title" class="video-title"></h2>
             <div id="video-channel" class="video-channel">
-                <a id="channel-link" href="#" target="_self">
-                    <img id="channel-avatar" class="channel-avatar" src="" alt="Channel Avatar">
-                <div class="channel-info">
-                    <span id="channel-name" class="channel-name"></span>
-                    <span id="channel-subscribers" class="channel-subscribers"></span>
-                </div>
-                </a>
-                <button id="share-btn" title="Share this video" style="margin-left:16px; background:transparent; border:none; cursor:pointer;">
-                    <img src="web/icons/share-96.svg" alt="Share" style="width:28px;height:28px">
+            <a id="channel-link" href="#" target="_self">
+                <img id="channel-avatar" class="channel-avatar" src="" alt="Channel Avatar">
+            <div class="channel-info">
+                <span id="channel-name" class="channel-name"></span>
+                <span id="channel-subscribers" class="channel-subscribers"></span>
+            </div>
+            </a>
+            <div class="channel-actions">
+                <span id="channel-likes" class="channel-likes"></span>
+                <button id="share-btn" title="Share this video" class="channel-action-btn">
+                <img src="web/icons/share-96.svg" alt="Share" style="width:28px;height:28px">
                 </button>
+            </div>
             </div>
     </div>
     <div id="video-stats">
-        <div class="stats-row"> 
-            <span id="view-count" class="view-count"></span>
-            <span id="like-count" class="like-count"></span>
+        <div class="stats-row">
+            <span id="view-count" class="video-stat"></span>
+            <span id="video-published-date" class="video-stat"></span>
         </div>
         <p id="video-description" class="video-description"></p>
     </div>

@@ -101,6 +101,18 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const list = document.getElementById('country-list');
   const dropdown = document.getElementById('country-dropdown');
   const mainHeader = document.getElementById('main-header-link');
+  const copyBtn = document.getElementById('copy-share-link-btn');
+  const params = new URLSearchParams(window.location.search);
+  const lang = params.get('lang');
+  const videoId = params.get('v');
+  const searchBtn = document.getElementById('search-btn');
+  const shareBtn = document.getElementById('share-btn');
+  const shareModal = document.getElementById('share-modal');
+  const shareLink = document.getElementById('share-link');
+  const shareCloseBtn = document.getElementById('share-close-btn');
+
+
+
 
   closePlayer(); // Close player on page load
     if (input) {
@@ -111,6 +123,12 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     if (event.key === 'Enter') {
       searchVideos();
     }
+  });
+
+  document.addEventListener('keydown', function(event) {
+  if (event.key === "Escape" && shareModal && shareModal.style.display === 'flex') {
+    shareModal.style.display = 'none';
+  }
   });
 
   btn.addEventListener('click', (e) => {
@@ -125,9 +143,6 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     btn.classList.remove('active');
   });
 
-  const params = new URLSearchParams(window.location.search);
-  const lang = params.get('lang');
-  const videoId = params.get('v');
   if (lang) {
     lastRegionCode = lang;
   } mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
@@ -164,18 +179,13 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     console.error("API Key error:", err);
   });
 
-  const searchBtn = document.getElementById('search-btn');
   if (searchBtn) {
     searchBtn.addEventListener('click', function() {
       searchVideos();
     });
   }
 
-  const shareBtn = document.getElementById('share-btn');
-  const shareModal = document.getElementById('share-modal');
-  const shareLink = document.getElementById('share-link');
-  const shareCloseBtn = document.getElementById('share-close-btn');
-
+  
   if (shareBtn && shareModal && shareLink && shareCloseBtn) {
     shareBtn.onclick = function() {
       if (!lastPlayedVideoId) return;
@@ -193,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     };
   }
 // Copy share link functionality
-  const copyBtn = document.getElementById('copy-share-link-btn');
   if (copyBtn && shareLink) {
     copyBtn.onclick = function() {
       shareLink.select();
@@ -206,17 +215,31 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 });
 
 function linkify(text) {
-  // Regex to match URLs (http/https)
-  text = text.replace(
-    /(https?:\/\/[^\s]+)/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-  );
-    // 2. Linkify local .html links with optional query parameters
-  text = text.replace(
-    /\b([a-zA-Z0-9_-]+\.html(?:\?[^\s]*)?)/g,
-    '<a href="$1">$1</a>'
-  );
-  return text;
+  // Create a temporary DOM element
+  const div = document.createElement('div');
+  div.innerHTML = text;
+
+  function walk(node) {
+    if (node.nodeType === 3) { // Text node
+      // Replace URLs in text nodes only
+      const replaced = node.nodeValue.replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      ).replace(
+        /\b([a-zA-Z0-9_-]+\.html(?:\?[^\s]*)?)/g,
+        '<a href="$1">$1</a>'
+      );
+      if (replaced !== node.nodeValue) {
+        const span = document.createElement('span');
+        span.innerHTML = replaced;
+        node.parentNode.replaceChild(span, node);
+      }
+    } else if (node.nodeType === 1 && node.tagName !== 'A') {
+      Array.from(node.childNodes).forEach(walk);
+    }
+  }
+  walk(div);
+  return div.innerHTML;
 }
 
 // --- Video Player Logic ---
@@ -232,8 +255,15 @@ async function videoInfoShow(videoId) {
         video = data.items[0];
         document.getElementById('video-title').textContent = video.snippet.title;
         document.getElementById('video-description').innerHTML = youtubeDescriptiontoPrivaTube(video.snippet.description);
-        document.getElementById('view-count').textContent = `${Number(video.statistics.viewCount).toLocaleString()} views`;
-        document.getElementById('like-count').textContent = `${video.statistics.likeCount ? Number(video.statistics.likeCount).toLocaleString()+" likes": ''}`;
+        document.getElementById('view-count').innerHTML = video.statistics.viewCount
+            ? `<img src="web/icons/views-96.svg" alt="Views" class="description-view-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${Number(video.statistics.viewCount)
+              .toLocaleString('de-DE')}`
+            : '';
+          const publishedDate = new Date(video.snippet.publishedAt);
+        document.getElementById('video-published-date').textContent =
+          publishedDate
+            ? publishedDate.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
+            : '';
       } else {
         throw new Error("No video data");
       }
@@ -241,7 +271,7 @@ async function videoInfoShow(videoId) {
       document.getElementById('video-title').textContent = 'Video Title';
       document.getElementById('video-description').textContent = 'Video description will appear here.';
       document.getElementById('view-count').textContent = 'Views: N/A';
-      document.getElementById('like-count').textContent = 'Likes: N/A';
+      
       video = null;
     }
 
@@ -256,7 +286,11 @@ async function videoInfoShow(videoId) {
           // After fetching channel info:
           document.getElementById('channel-name').textContent = channel.snippet.title;
           document.getElementById('channel-name').style.cursor = "pointer";
-
+          // Add this for likes:
+          const likeCount = video.statistics.likeCount ? Number(video.statistics.likeCount).toLocaleString() : '';
+          document.getElementById('channel-likes').innerHTML = likeCount
+            ? `<img src="web/icons/like-96.svg" alt="Likes" class="channel-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${likeCount}`
+            : '';
           document.getElementById('channel-avatar').src = channel.snippet.thumbnails.default.url;
           document.getElementById('channel-avatar').alt = channel.snippet.title;
           document.getElementById('channel-avatar').style.cursor = "pointer";
@@ -387,6 +421,22 @@ function youtubeDescriptiontoPrivaTube(description) {
     /https?:\/\/(?:www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/g,
     'index.html?ch=$1'
   );
+
+  // Match Timecodes in the format "00:00" or "0:00" or "00:0"
+  const timecodeRegex = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
+  description = description.replace(timecodeRegex, (match) => {
+    // Convert to seconds
+    const parts = match.split(':').map(Number);
+    let seconds = 0;
+    if (parts.length === 3) {
+      seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      seconds = parts[0] * 60 + parts[1];
+    } else {
+      seconds = parts[0]; // Just in case
+    }
+    return `<a href="video.html?v=${lastPlayedVideoId}&t=${seconds}">${match}</a>`;
+  });
 
   return linkify(description);
 }
