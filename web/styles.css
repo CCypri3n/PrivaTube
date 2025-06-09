@@ -15,10 +15,8 @@ html, body {
     }
 
 /* Lower opacity when video is playing */
-body.video-playing .main-header,
-body.video-playing .country-dropdown,
-body.video-playing .search-bar-wrapper {
-  opacity: 0.35;
+body.video-playing .main-header {
+  opacity: 0.5;
   transition: opacity 0.2s;
   pointer-events: auto;
 }
@@ -282,7 +280,7 @@ h1, h5 {
 
 #country-code-btn:hover,
 #country-code-btn.active {
-  background: rgba(128, 128, 128, 0.9);
+  background: crimson;
 }
 
 .country-list {
@@ -554,8 +552,7 @@ h1, h5 {
 
 #video-description {
   margin-top: 8px;
-  margin-left: 3%;      /* Increase this value for more right padding */
-  padding-left: 18px;   /* Add left padding for inner spacing */
+  margin-left: 2%;      /* Increase this value for more right padding */  /* Add left padding for inner spacing */
   color: #ccc;
   max-width: 90%;
   word-break: break-word;
@@ -788,19 +785,78 @@ h1, h5 {
   gap: 0;
   margin-bottom: 4px;
 }
-
 #comment-action-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
   margin-top: 16px;
   margin-bottom: 16px;
   margin-left: 1.5%;
+  margin-right: 2%;
+  gap: 12px;
 }
 
 .comment-count {
   color: #fff;
   font-size: 1.2em;
   font-weight: bold;
-  margin-bottom: 4px;
+}
+
+.comment-sort-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#comment-sort-btn {
+  background: rgba(40,40,40,0.85);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 16px 6px 10px;
+  font-size: 1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+
+#comment-sort-btn:hover,
+#comment-sort-btn.active {
+  background: crimson;
+  color: #fff;
+}
+
+#comment-sort-label {
+  font-size: 1em;
+  font-weight: normal;
+}
+
+#comment-list {
+  display: none;
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background: rgba(40, 40, 40, 0.97);
+  border-radius: 10px;
+  min-width: 140px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+  padding: 4px 0;
+  z-index: 10;
+}
+
+#comment-list div {
+  padding: 8px 18px;
+  font-size: 1em;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #fff;
+  background: none;
+  transition: background 0.15s;
+}
+
+#comment-list div:hover {
+  background: rgba(220,0,0,0.15);
+  color: #fff;
 }
