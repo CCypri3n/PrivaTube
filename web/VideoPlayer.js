@@ -6,7 +6,7 @@ let lastQuery = '';
 let lastChannelId = '';
 let lastRegionCode = 'FR'; // for trending/homepage
 let currentCommentsVideoId = null;
-let commentSort = 'time'; // Default sort order for comments
+let commentSort = 'relevance'; // Default sort order for comments, time or relevance
 
 let API_KEY = '';
 
