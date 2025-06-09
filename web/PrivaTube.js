@@ -305,22 +305,35 @@ async function fetchChannelVideos(channelId, loadMore = false) {
 
 
 // --- Results Rendering Helpers ---
-function displayResults(items, channelStats = {}) {
+async function displayResults(items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
   if (!items || items.length === 0) {
     resultsDiv.innerHTML = "<p>No results found.</p>";
     toggleLoadMoreButton(false);
     return;
   }
-  resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats)).join('');
+  const videoItems = items.filter(item => item.id.kind === "youtube#video");
+  const videoIds = videoItems.map(item => item.id.videoId).join(',');
+  let videoStats = {};
+  if (videoIds) {
+    const statsResp = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}&key=${API_KEY}`
+    );
+    const statsData = await statsResp.json();
+    statsData.items.forEach(v => {
+      videoStats[v.id] = v.statistics;
+    });
+  }
+  resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
 }
 
 function appendResults(items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
   resultsDiv.innerHTML += items.map(item => renderResultItem(item, channelStats)).join('');
 }
-function renderResultItem(item, channelStats = {}) {
+function renderResultItem(item, channelStats = {}, videoStats = {}) {
   if (item.id.kind === "youtube#video") {
+    const stats = videoStats[item.id.videoId];
     // Format date as "YYYY-MM-DD" or any other style you prefer
     const dateStr = item.snippet.publishedAt
       ? new Date(item.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -339,6 +352,10 @@ function renderResultItem(item, channelStats = {}) {
             <a href="${channelUrl}" class="channel-link" target="_self">
                 ${item.snippet.channelTitle}
             </a>
+            <span class="video-meta-sep">&nbsp;•&nbsp;</span>
+            <span class="video-views-render">
+                ${stats && stats.viewCount ? Number(stats.viewCount).toLocaleString() : 'N/A'} views
+            </span>
             </div>
         </div>
         `

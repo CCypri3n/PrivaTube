@@ -373,7 +373,7 @@ h1, h5 {
   text-decoration: underline;
 }
 
-.video-date {
+.video-date, .video-views-render {
   color: #bbb;
   font-size: 0.95em;
   margin-bottom: 1px;

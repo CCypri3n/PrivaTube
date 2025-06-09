@@ -3,5 +3,10 @@ A private youtube browser and player - All on your computer or on a github page.
 
 ## FIX
 
-Replace Youtube URLS in Video description with custom for PrivaTube
-For channel: Check if NOT @ for custom Url, @ will not provide a channel id.
+- Put likes to the right of name
+- Description:
+XXX,XXX views   Oct. 12, 2023
+
+Text
+
+- Add video length to thumbnail
