@@ -9,4 +9,4 @@ XXX,XXX views   Oct. 12, 2023
 
 Text
 
-- Add video length to thumbnail
+- Add option to click time-stamps in description

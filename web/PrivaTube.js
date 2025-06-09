@@ -15,6 +15,27 @@ function parseDuration(isoDuration) {
   return minutes * 60 + seconds;
 }
 
+function parseDurationToVisual(duration) {
+    // Regular expression to parse the duration
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+
+    if (!match) {
+        return "Invalid duration format";
+    }
+
+    // Extract hours, minutes, and seconds
+    const hours = parseInt(match[1]) || 0;
+    const minutes = parseInt(match[2]) || 0;
+    const seconds = parseInt(match[3]) || 0;
+
+    // Format to hh:mm:ss or mm:ss based on whether hours are present
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
 // Filter shorts from a list of video items using duration and #shorts in title/description
 // Filter shorts from a list of video items using duration and #shorts in title/description
 async function filterOutShorts(videoItems) {
@@ -317,11 +338,11 @@ async function displayResults(items, channelStats = {}) {
   let videoStats = {};
   if (videoIds) {
     const statsResp = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}&key=${API_KEY}`
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}&key=${API_KEY}`
     );
     const statsData = await statsResp.json();
     statsData.items.forEach(v => {
-      videoStats[v.id] = v.statistics;
+      videoStats[v.id] = v;
     });
   }
   resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
@@ -340,10 +361,14 @@ function renderResultItem(item, channelStats = {}, videoStats = {}) {
       : '';
     const videoUrl = createVideoUrl(item.id.videoId);
     const channelUrl = createChannelUrl(item.snippet.channelId);
+    const duration = stats && stats.contentDetails ? parseDurationToVisual(stats.contentDetails.duration) : 'N/A';
     return `
         <div class="video-item">
             <a href="${videoUrl}" target="_self">
-              <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
+              <div class="video-thumb-container">
+                <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
+                <span class="video-duration">${duration}</span>
+              </div>
             </a>
             <h3>${item.snippet.title}</h3>
             <div class="video-meta">
@@ -354,7 +379,7 @@ function renderResultItem(item, channelStats = {}, videoStats = {}) {
             </a>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
             <span class="video-views-render">
-                ${stats && stats.viewCount ? Number(stats.viewCount).toLocaleString() : 'N/A'} views
+                ${stats && stats.statistics.viewCount ? Number(stats.statistics.viewCount).toLocaleString() : 'N/A'} views
             </span>
             </div>
         </div>

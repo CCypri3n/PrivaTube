@@ -673,3 +673,32 @@ h1, h5 {
   transition: color 0.15s;
   margin-bottom: 0px;
 }
+
+.video-thumb-container {
+  position: relative;
+  width: 100%;
+  display: inline-block;
+}
+
+.video-thumb-container img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.video-duration {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(30, 30, 30, 0.85);
+  color: #fff;
+  font-size: 0.98em;
+  font-weight: bold;
+  padding: 3px 10px 3px 10px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  pointer-events: none;
+  letter-spacing: 0.5px;
+  min-width: 38px;
+  text-align: center;
+}
