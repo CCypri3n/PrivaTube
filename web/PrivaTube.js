@@ -357,7 +357,7 @@ function renderResultItem(item, channelStats = {}, videoStats = {}) {
     const stats = videoStats[item.id.videoId];
     // Format date as "YYYY-MM-DD" or any other style you prefer
     const dateStr = item.snippet.publishedAt
-      ? new Date(item.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      ? new Date(item.snippet.publishedAt).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
       : '';
     const videoUrl = createVideoUrl(item.id.videoId);
     const channelUrl = createChannelUrl(item.snippet.channelId);
