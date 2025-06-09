@@ -29,6 +29,12 @@ body.video-playing .search-bar-wrapper:hover {
   opacity: 1;
 }
 
+a {
+  color: #ff4b6e; /* Crimson color for links */
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
 /* --- Header --- */
 .main-header {
   position: fixed;
@@ -145,10 +151,28 @@ body.video-playing .search-bar-wrapper:hover {
   cursor: pointer;
   transition: box-shadow 0.2s, background 0.2s;
   text-align: center;
+  color: crimson;
+  text-decoration: none;
 }
+
 .channel-item:hover {
   background: rgba(220, 0, 0, 0.08);
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+a > .channel-item,
+a > .channel-item:hover,
+a > .channel-item:focus,
+a > .channel-item:active,
+a:visited > .channel-item {
+  text-decoration: none !important;
+  color: crimson;
+  outline: none;
+}
+
+a > .channel-item:focus {
+  outline: 2px solid crimson; /* for accessibility */
+  outline-offset: 2px;
 }
 
 
@@ -530,7 +554,8 @@ h1, h5 {
 
 #video-description {
   margin-top: 8px;
-  margin-left: 1%;
+  margin-left: 3%;      /* Increase this value for more right padding */
+  padding-left: 18px;   /* Add left padding for inner spacing */
   color: #ccc;
   max-width: 90%;
   word-break: break-word;
@@ -546,7 +571,6 @@ h1, h5 {
 #video-description a:hover {
   color: #fff;
 }
-
 
 .video-title {
   color: #fff;
@@ -762,5 +786,21 @@ h1, h5 {
   display: flex;
   align-items: center;
   gap: 0;
+  margin-bottom: 4px;
+}
+
+#comment-action-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  margin-left: 1.5%;
+}
+
+.comment-count {
+  color: #fff;
+  font-size: 1.2em;
+  font-weight: bold;
   margin-bottom: 4px;
 }

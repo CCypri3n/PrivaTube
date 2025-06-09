@@ -6,6 +6,7 @@ let lastQuery = '';
 let lastChannelId = '';
 let lastRegionCode = 'FR'; // for trending/homepage
 let currentCommentsVideoId = null;
+let commentSort = 'time'; // Default sort order for comments
 
 let API_KEY = '';
 
@@ -99,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const input = document.getElementById('searchQuery');
   const btn = document.getElementById('country-code-btn');
   const list = document.getElementById('country-list');
-  const dropdown = document.getElementById('country-dropdown');
   const mainHeader = document.getElementById('main-header-link');
   const copyBtn = document.getElementById('copy-share-link-btn');
   const params = new URLSearchParams(window.location.search);
@@ -110,8 +110,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const shareModal = document.getElementById('share-modal');
   const shareLink = document.getElementById('share-link');
   const shareCloseBtn = document.getElementById('share-close-btn');
-
-
+  const commentSortBtn = document.getElementById('comment-sort-btn');
+  const commentList = document.getElementById('comment-list');
 
 
   closePlayer(); // Close player on page load
@@ -137,10 +137,18 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     btn.classList.toggle('active');
   });
 
+  commentSortBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    commentList.style.display = (commentList.style.display === 'block') ? 'none' : 'block';
+    commentSortBtn.classList.toggle('active');
+  });
+
   // Hide dropdown when clicking outside
   document.addEventListener('click', () => {
     list.style.display = 'none';
     btn.classList.remove('active');
+    commentList.style.display = 'none';
+    commentSortBtn.classList.remove('active');
   });
 
   if (lang) {
@@ -165,6 +173,20 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
     });
  });
+  // Handle sort selection
+  commentList.querySelectorAll('div').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const code = item.getAttribute('data-code');
+      commentSort = code === 'recent' ? 'time' : 'relevance';
+      commentList.style.display = 'none';
+      commentSortBtn.classList.remove('active');
+      // Reload comments with new sort order
+      if (currentCommentsVideoId) {
+        displayComments(currentCommentsVideoId);
+        document.getElementById("comment-count").textContent = video.statistics.commentCount ? `${Number(video.statistics.commentCount).toLocaleString('en-EN')} Comments` : 'N/A Comments';
+      }
+    });
+  });
   
   fetchApiKey().then(key => {
   if (key && videoId) {
@@ -264,6 +286,9 @@ async function videoInfoShow(videoId) {
           publishedDate
             ? publishedDate.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
             : '';
+        currentCommentsVideoId = videoId;
+        displayComments(videoId); // Load comments for the video
+        document.getElementById("comment-count").textContent = video.statistics.commentCount ? `${Number(video.statistics.commentCount).toLocaleString('en-EN')} Comments` : 'N/A Comments';
       } else {
         throw new Error("No video data");
       }
@@ -300,8 +325,6 @@ async function videoInfoShow(videoId) {
               ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
               : '';
           document.title = `PrivaTube - Watching "${channel.snippet.title}"`;
-          currentCommentsVideoId = videoId;
-          displayComments(videoId); // Load comments for the video
           console.log("Channel info fetched successfully:", channel);
         }
       } catch (err) {
@@ -324,7 +347,6 @@ async function videoInfoShow(videoId) {
     document.getElementById('video-description').textContent = "";
     document.getElementById('video-description').innerHTML = "";
     document.getElementById('view-count').textContent = "";
-    document.getElementById('like-count').textContent = "";
     document.getElementById('channel-avatar').src = '';
     document.getElementById('channel-avatar').alt = '';
     document.getElementById('channel-avatar').style.cursor = "default";
@@ -483,7 +505,7 @@ function displayComments(videoId, pageToken = null, append = false) {
     commentWrapper.textContent = 'No video selected.';
     return;
   }
-  let apiUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}`;
+  let apiUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}&order=${commentSort}`;
   if (pageToken) apiUrl += `&pageToken=${pageToken}`;
   fetch(apiUrl)
     .then(response => response.json())

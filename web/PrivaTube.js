@@ -147,9 +147,9 @@ async function showHomepage(loadMore = false) {
         snippet: item.snippet
       }));
     if (loadMore) {
-      appendResults(items);
+      displayResults(true, items);
     } else {
-      displayResults(items);
+      displayResults(false, items);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (error) {
@@ -208,9 +208,9 @@ async function searchVideos(loadMore = false) {
     const filteredVideos = await filterOutShorts(videoItems);
     const finalItems = [...filteredVideos, ...channelItems];
     if (loadMore) {
-      appendResults(finalItems, channelStats);
+      displayResults(true, finalItems, channelStats);
     } else {
-      displayResults(finalItems, channelStats);
+      displayResults(false, finalItems, channelStats);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (error) {
@@ -309,10 +309,10 @@ async function fetchChannelVideos(channelId, loadMore = false) {
     // Only show up to 24 videos per page
     const videosToShow = filteredVideos.slice(0, 24);
 
-    if (loadMore) {
-      appendResults(videosToShow);
+if (loadMore) {
+      displayResults(true, videosToShow);
     } else {
-      displayResults(videosToShow);
+      displayResults(false, videosToShow);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (err) {
@@ -326,7 +326,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
 
 
 // --- Results Rendering Helpers ---
-async function displayResults(items, channelStats = {}) {
+async function displayResults(append, items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
   if (!items || items.length === 0) {
     resultsDiv.innerHTML = "<p>No results found.</p>";
@@ -345,13 +345,14 @@ async function displayResults(items, channelStats = {}) {
       videoStats[v.id] = v;
     });
   }
-  resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
+  if (append) {
+    resultsDiv.innerHTML += items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
+  }
+  else {
+    resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
+  }
 }
 
-function appendResults(items, channelStats = {}) {
-  const resultsDiv = document.getElementById('results');
-  resultsDiv.innerHTML += items.map(item => renderResultItem(item, channelStats)).join('');
-}
 function renderResultItem(item, channelStats = {}, videoStats = {}) {
   if (item.id.kind === "youtube#video") {
     const stats = videoStats[item.id.videoId];
