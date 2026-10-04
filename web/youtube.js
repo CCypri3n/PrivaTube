@@ -124,9 +124,9 @@ const YouTube = (function () {
      * Builds a Listing from a page source.
      * fetchPage(token) -> Promise<{ items, nextPageToken }> with items already
      * normalized and filtered. Only items for which `isCounted` is true count
-     * toward the page target.
+     * toward the page target. `maxRequests` bounds the pages fetched per batch.
      */
-    function makeListing(fetchPage, isCounted) {
+    function makeListing(fetchPage, isCounted, maxRequests = MAX_REFILL_REQUESTS) {
       let token = null;
       let done = false;
       const seen = new Set();
@@ -137,7 +137,7 @@ const YouTube = (function () {
         const items = [];
         const batchSeen = new Set();
         let nextToken = token;
-        for (let i = 0; i < MAX_REFILL_REQUESTS; i++) {
+        for (let i = 0; i < maxRequests; i++) {
           const page = await fetchPage(nextToken);
           for (const item of page.items) {
             const key = `${item.kind}:${item.id}`;
@@ -280,7 +280,74 @@ const YouTube = (function () {
       }, countVideos);
     }
 
-    return { trending, search, channel, channelUploads };
+    // One video with its channel. Unknown video => Failure('not_found').
+    // channel is null when YouTube returns no such channel.
+    async function video(videoId) {
+      const v = await call('videos', { part: 'snippet,statistics', id: videoId });
+      const resource = (v.items || [])[0];
+      if (!resource || !resource.snippet) throw new Failure('not_found', 'Video not found');
+      const stats = resource.statistics || {};
+      const channelId = resource.snippet.channelId;
+      let channel = null;
+      if (channelId) {
+        const c = await call('channels', { part: 'snippet,statistics', id: channelId });
+        const cr = (c.items || [])[0];
+        if (cr) {
+          const cs = cr.snippet || {};
+          const avatar = cs.thumbnails && (cs.thumbnails.default || cs.thumbnails.medium || cs.thumbnails.high);
+          channel = {
+            id: channelId,
+            title: cs.title || '',
+            avatar: (avatar && avatar.url) || '',
+            subscriberCount: toNumber(cr.statistics && cr.statistics.subscriberCount)
+          };
+        }
+      }
+      return {
+        id: resource.id,
+        title: resource.snippet.title || '',
+        description: resource.snippet.description || '',
+        publishedAt: resource.snippet.publishedAt || '',
+        viewCount: toNumber(stats.viewCount),
+        likeCount: toNumber(stats.likeCount),
+        commentCount: toNumber(stats.commentCount),
+        channel
+      };
+    }
+
+    function commentItem(thread) {
+      const c = thread.snippet.topLevelComment.snippet;
+      return {
+        kind: 'comment',
+        id: thread.id,
+        text: c.textDisplay || c.textOriginal || '',
+        authorName: c.authorDisplayName || '',
+        authorChannelId: (c.authorChannelId && c.authorChannelId.value) || '',
+        authorAvatar: c.authorProfileImageUrl || '',
+        publishedAt: c.publishedAt || '',
+        likeCount: toNumber(c.likeCount)
+      };
+    }
+
+    // Comments of a video as a Listing; order is 'relevance' (default) or 'time'.
+    // Each call returns a list with its own position.
+    function comments(videoId, { order = 'relevance' } = {}) {
+      return makeListing(async pageToken => {
+        const data = await call('commentThreads', {
+          part: 'snippet',
+          videoId,
+          order,
+          maxResults: PAGE_SIZE,
+          pageToken
+        });
+        return {
+          nextPageToken: data.nextPageToken,
+          items: (data.items || []).filter(t => t && t.snippet && t.snippet.topLevelComment).map(commentItem)
+        };
+      }, () => true, 1); // nothing is filtered out, so one request per batch
+    }
+
+    return { trending, search, channel, channelUploads, video, comments };
   }
 
   return { create, Failure };
