@@ -2,6 +2,11 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+
+## 2026-10-05 — Settings panel review fixes (#14)
+- `web/settings.js`: the Show Shorts change is applied when the panel closes (no scroll jump behind the open panel); Tab is kept inside the dialog; the gear button reports `aria-expanded`.
+- `web/styles.css`: the gear glyph is forced to text presentation (`font-variant-emoji`) so it does not render as an emoji.
+
 ## 2026-10-05 — Settings panel: forget API key and Show Shorts toggle (closes #14)
 - New `web/settings.js` (`Settings.getShowShorts()` / `setShowShorts()`, `create({ storage })`, `bindPanel`), loaded by both pages; tested in `tests/settings.test.js` with a fake storage (default off, persistence, invalid stored values -> off, throwing or missing storage tolerated with the value kept for the page session).
 - Both pages: gear button in the header left of the region dropdown, opening a "Settings" modal (same style as the key and share popups; `role="dialog"`, labelled button, Close button, Escape and backdrop click close it, focus moves in and back to the button).

@@ -291,6 +291,7 @@ h1, h5 {
   background: rgba(128, 128, 128, 0.7);
   color: white;
   font-size: 0.95em;
+  font-variant-emoji: text;
   line-height: 1.2;
   padding: 4px 10px;
   border-radius: 10px;

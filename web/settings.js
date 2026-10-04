@@ -65,28 +65,45 @@ const Settings = (function () {
     const closeBtn = d.getElementById('settings-close-btn');
     if (!btn || !modal || !forgetBtn || !toggle || !closeBtn) return;
 
+    let dirty = false; // apply the Shorts change when the panel closes, so the page doesn't jump behind it
     const open = () => {
       toggle.checked = api.getShowShorts();
       modal.style.display = 'flex';
+      btn.setAttribute('aria-expanded', 'true');
       toggle.focus();
     };
     const close = () => {
       if (modal.style.display === 'none') return;
       modal.style.display = 'none';
+      btn.setAttribute('aria-expanded', 'false');
       btn.focus();
+      if (dirty) {
+        dirty = false;
+        if (onShortsChange) onShortsChange(api.getShowShorts());
+      }
     };
 
     btn.addEventListener('click', e => { e.stopPropagation(); open(); });
     closeBtn.addEventListener('click', close);
     modal.querySelector('.api-key-modal-backdrop').addEventListener('click', close);
     d.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && modal.style.display !== 'none') close();
+      if (modal.style.display === 'none') return;
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key === 'Tab') { // keep focus inside the dialog
+        const items = [toggle, forgetBtn, closeBtn];
+        const i = items.indexOf(d.activeElement);
+        const next = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1);
+        e.preventDefault();
+        items[next].focus();
+      }
     });
     toggle.addEventListener('change', () => {
       api.setShowShorts(toggle.checked);
-      if (onShortsChange) onShortsChange(api.getShowShorts());
+      dirty = true;
     });
     forgetBtn.addEventListener('click', () => {
+      btn.setAttribute('aria-expanded', 'false');
+      dirty = false; // forgetting the key re-renders anyway
       modal.style.display = 'none'; // the key popup takes over; focus goes to its input
       if (onForgetKey) onForgetKey();
     });
