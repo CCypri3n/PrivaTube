@@ -1,15 +1,30 @@
-const BASE_URL = 'https://www.googleapis.com/youtube/v3/search';
-
-let nextPageToken = null;
 let currentMode = 'home'; // 'home', 'search', or 'channel'
 let lastQuery = '';
 let lastChannelId = '';
 let lastRegionCode = 'FR'; // for trending/homepage
 let currentCommentsVideoId = null;
+let currentComments = null;      // the comment Listing for the current video and sort
+let currentCommentCount = null;  // comment total of the current video (number or null)
 let commentSort = 'relevance'; // Default sort order for comments, time or relevance
 
 let API_KEY = '';
 
+function youtube() {
+  return YouTube.create({ apiKey: API_KEY, fetchJson: url => fetch(url).then(r => r.json()) });
+}
+
+function messageForFailure(error, fallback) {
+  const reason = error && error.reason;
+  if (reason === 'quota_exceeded') return "YouTube's daily limit for your API key has been reached. Please try again tomorrow.";
+  if (reason === 'invalid_key') return "Your API key is invalid. Please check it and try again.";
+  if (reason === 'offline') return "You appear to be offline. Please check your connection and try again.";
+  if (reason === 'not_found') return "Not found.";
+  return fallback;
+}
+
+function commentCountText() {
+  return currentCommentCount ? `${currentCommentCount.toLocaleString('en-EN')} Comments` : 'N/A Comments';
+}
 
 function fetchApiKey() {
   const storedKey = localStorage.getItem('api_key');
@@ -183,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
       // Reload comments with new sort order
       if (currentCommentsVideoId) {
         displayComments(currentCommentsVideoId);
-        document.getElementById("comment-count").textContent = video.statistics.commentCount ? `${Number(video.statistics.commentCount).toLocaleString('en-EN')} Comments` : 'N/A Comments';
+        document.getElementById("comment-count").textContent = commentCountText();
       }
     });
   });
@@ -271,71 +286,54 @@ async function videoInfoShow(videoId) {
   if (videoId) {
     let video = null;
     try {
-      const resp = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${API_KEY}`);
-      const data = await resp.json();
-      if (data.items && data.items.length > 0) {
-        video = data.items[0];
-        document.getElementById('video-title').textContent = video.snippet.title;
-        document.getElementById('video-description').innerHTML = youtubeDescriptiontoPrivaTube(video.snippet.description);
-        document.getElementById('view-count').innerHTML = video.statistics.viewCount
-            ? `<img src="web/icons/views-96.svg" alt="Views" class="description-view-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${Number(video.statistics.viewCount)
-              .toLocaleString('de-DE')}`
-            : '';
-          const publishedDate = new Date(video.snippet.publishedAt);
-        document.getElementById('video-published-date').textContent =
-          publishedDate
-            ? publishedDate.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
-            : '';
-        currentCommentsVideoId = videoId;
-        displayComments(videoId); // Load comments for the video
-        document.getElementById("comment-count").textContent = video.statistics.commentCount ? `${Number(video.statistics.commentCount).toLocaleString('en-EN')} Comments` : 'N/A Comments';
-      } else {
-        throw new Error("No video data");
-      }
+      video = await youtube().video(videoId);
+      document.getElementById('video-title').textContent = video.title;
+      document.getElementById('video-description').innerHTML = youtubeDescriptiontoPrivaTube(video.description);
+      document.getElementById('view-count').innerHTML = video.viewCount
+          ? `<img src="web/icons/views-96.svg" alt="Views" class="description-view-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${video.viewCount
+            .toLocaleString('de-DE')}`
+          : '';
+      const publishedDate = new Date(video.publishedAt);
+      document.getElementById('video-published-date').textContent =
+        publishedDate
+          ? publishedDate.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
+          : '';
+      currentCommentsVideoId = videoId;
+      currentCommentCount = video.commentCount;
+      displayComments(videoId); // Load comments for the video
+      document.getElementById("comment-count").textContent = commentCountText();
     } catch (err) {
-      document.getElementById('video-title').textContent = 'Video Title';
+      console.error("Error fetching video info:", err);
+      document.getElementById('video-title').textContent = messageForFailure(err, 'Video Title');
       document.getElementById('video-description').textContent = 'Video description will appear here.';
       document.getElementById('view-count').textContent = 'Views: N/A';
-      
       video = null;
     }
 
-    // Only fetch channel info if video was found
-    if (video) {
-      try {
-        const channelID = video.snippet.channelId;
-        const channelResp = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelID}&key=${API_KEY}`);
-        const channelData = await channelResp.json();
-        if (channelData.items && channelData.items.length > 0) {
-          const channel = channelData.items[0];
-          // After fetching channel info:
-          document.getElementById('channel-name').textContent = channel.snippet.title;
-          document.getElementById('channel-name').style.cursor = "pointer";
-          // Add this for likes:
-          const likeCount = video.statistics.likeCount ? Number(video.statistics.likeCount).toLocaleString() : '';
-          document.getElementById('channel-likes').innerHTML = likeCount
-            ? `<img src="web/icons/like-96.svg" alt="Likes" class="channel-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${likeCount}`
-            : '';
-          document.getElementById('channel-avatar').src = channel.snippet.thumbnails.default.url;
-          document.getElementById('channel-avatar').alt = channel.snippet.title;
-          document.getElementById('channel-avatar').style.cursor = "pointer";
-          document.getElementById('channel-link').href = createChannelUrl(channelID);
-          document.getElementById('channel-subscribers').textContent =
-            channel.statistics.subscriberCount
-              ? `${Number(channel.statistics.subscriberCount).toLocaleString()} subscribers`
-              : '';
-          document.title = `PrivaTube - Watching "${channel.snippet.title}"`;
-          console.log("Channel info fetched successfully:", channel);
-        }
-      } catch (err) {
-        console.error("Error fetching channel info:", err);
-        document.getElementById('channel-avatar').src = '';
-        document.getElementById('channel-avatar').alt = '';
-        document.getElementById('channel-avatar').style.cursor = "default";
-        document.getElementById('channel-name').textContent = 'Channel Name';
-        document.getElementById('channel-name').style.cursor = "default";
-        document.getElementById('channel-subscribers').textContent = 'Channel Subscribers: N/A';
-      }
+    if (video && video.channel) {
+      const channel = video.channel;
+      document.getElementById('channel-name').textContent = channel.title;
+      document.getElementById('channel-name').style.cursor = "pointer";
+      const likeCount = video.likeCount ? video.likeCount.toLocaleString() : '';
+      document.getElementById('channel-likes').innerHTML = likeCount
+        ? `<img src="web/icons/like-96.svg" alt="Likes" class="channel-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${likeCount}`
+        : '';
+      document.getElementById('channel-avatar').src = channel.avatar;
+      document.getElementById('channel-avatar').alt = channel.title;
+      document.getElementById('channel-avatar').style.cursor = "pointer";
+      document.getElementById('channel-link').href = createChannelUrl(channel.id);
+      document.getElementById('channel-subscribers').textContent =
+        channel.subscriberCount
+          ? `${channel.subscriberCount.toLocaleString()} subscribers`
+          : '';
+      document.title = `PrivaTube - Watching "${channel.title}"`;
+    } else if (video) {
+      document.getElementById('channel-avatar').src = '';
+      document.getElementById('channel-avatar').alt = '';
+      document.getElementById('channel-avatar').style.cursor = "default";
+      document.getElementById('channel-name').textContent = 'Channel Name';
+      document.getElementById('channel-name').style.cursor = "default";
+      document.getElementById('channel-subscribers').textContent = 'Channel Subscribers: N/A';
     } else {
       document.getElementById('channel-avatar').src = '';
       document.getElementById('channel-avatar').alt = '';
@@ -493,85 +491,83 @@ function youtubeCommentPrivaTube(comment) {
   return comment;
 }
 
-function displayComments(videoId, pageToken = null, append = false) {
+// (Re)starts the comment list for a video with the current sort order.
+function displayComments(videoId) {
   const commentWrapper = document.getElementById('comment-wrapper');
   if (!commentWrapper) {
     console.error('No comment element found in html:', commentWrapper);
     return;
   }
-
-  if (!append) commentWrapper.innerHTML = ''; // Clear previous comments
+  commentWrapper.innerHTML = ''; // Clear previous comments
+  toggleLoadMoreButton(false);
   if (!videoId) {
+    currentComments = null;
     commentWrapper.textContent = 'No video selected.';
     return;
   }
-  let apiUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${API_KEY}&order=${commentSort}`;
-  if (pageToken) apiUrl += `&pageToken=${pageToken}`;
-  fetch(apiUrl)
-    .then(response => response.json())
-    .then(data => {
-      if (data.items && data.items.length > 0) {
-        data.items.forEach(item => {
-          const comment = item.snippet.topLevelComment.snippet;
-          // Example: inside your displayComments function
-          const commentDiv = document.createElement('div');
-          const channelUrl = createChannelUrl(comment.authorChannelId.value)
-          const rawText = comment.textDisplay || comment.textOriginal || '';
-          if (!rawText) {
-            console.warn("Comment text is empty, skipping:", comment);
-            return; // Skip empty comments
-          }
-          else {
-            text = youtubeCommentPrivaTube(rawText);
-          }
-          // Create comment element
-          const likeCount = comment.likeCount ? Number(comment.likeCount).toLocaleString() : '';
-          commentDiv.className = 'comment';
-          commentDiv.innerHTML = `
-            <a href="${channelUrl}" class="comment-avatar-link">
-              <img src="${comment.authorProfileImageUrl}" alt=" " class="comment-avatar"
-                onerror="this.onerror=null;this.src='web/icons/unavailableAvatar-96.svg';">
-            </a>
-            <div class="comment-main">
-              <div class="comment-header">
-              ${comment.authorChannelId ? `<a href="${channelUrl}" class="comment-author-link"><label class="comment-author">${comment.authorDisplayName}</label></a>` : `<strong class="comment-author">${comment.authorDisplayName}</strong>`}
-                <span class="comment-date">${
-                new Date(comment.publishedAt).toLocaleString(undefined, {
-                  day: '2-digit', month: '2-digit', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit'
-                })
-              }</span>
-              </div>
-              <div class="comment-text">${text}</div>
-               <div class="comment-likes">
-                  ${likeCount ? `<img src="web/icons/like-96.svg" alt="Likes" class="comment-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">${likeCount}` : ''}
-                </div>
-            </div>
-          `;
-          commentWrapper.appendChild(commentDiv);
-        });
-         // Show "Load More" button if there are more comments
-        if (data.nextPageToken) {
-          nextPageToken = data.nextPageToken;
-          toggleLoadMoreButton(true);
-        } else {
-          nextPageToken = null;
-          toggleLoadMoreButton(false);
-        }
-      } else {
-        commentsDiv.textContent = 'No comments available.';
-      }
-    })
-    .catch(err => {
-      console.error("Error fetching comments:", err);
-      commentsDiv.textContent = 'Error loading comments.';
-    });
+  currentComments = youtube().comments(videoId, { order: commentSort });
+  loadMoreComments(true);
+}
+
+async function loadMoreComments(first = false) {
+  const commentWrapper = document.getElementById('comment-wrapper');
+  const list = currentComments;
+  if (!list) return;
+  let batch;
+  try {
+    batch = await list.more();
+  } catch (err) {
+    if (list !== currentComments) return; // sort changed meanwhile
+    console.error("Error fetching comments:", err);
+    if (first) commentWrapper.textContent = messageForFailure(err, 'Error loading comments.');
+    else toggleLoadMoreButton(true); // allow retry
+    return;
+  }
+  if (list !== currentComments) return; // sort changed meanwhile: drop stale batch
+  if (first && batch.items.length === 0) {
+    commentWrapper.textContent = 'No comments available.';
+    toggleLoadMoreButton(false);
+    return;
+  }
+  batch.items.forEach(comment => {
+    const commentDiv = document.createElement('div');
+    const channelUrl = comment.authorChannelId ? createChannelUrl(comment.authorChannelId) : '';
+    const rawText = comment.text;
+    if (!rawText) {
+      console.warn("Comment text is empty, skipping:", comment);
+      return; // Skip empty comments
+    }
+    const text = youtubeCommentPrivaTube(rawText);
+    const likeCount = comment.likeCount ? comment.likeCount.toLocaleString() : '';
+    commentDiv.className = 'comment';
+    commentDiv.innerHTML = `
+      <a href="${channelUrl}" class="comment-avatar-link">
+        <img src="${comment.authorAvatar}" alt=" " class="comment-avatar"
+          onerror="this.onerror=null;this.src='web/icons/unavailableAvatar-96.svg';">
+      </a>
+      <div class="comment-main">
+        <div class="comment-header">
+        ${comment.authorChannelId ? `<a href="${channelUrl}" class="comment-author-link"><label class="comment-author">${comment.authorName}</label></a>` : `<strong class="comment-author">${comment.authorName}</strong>`}
+          <span class="comment-date">${
+          new Date(comment.publishedAt).toLocaleString(undefined, {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          })
+        }</span>
+        </div>
+        <div class="comment-text">${text}</div>
+         <div class="comment-likes">
+            ${likeCount ? `<img src="web/icons/like-96.svg" alt="Likes" class="comment-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">${likeCount}` : ''}
+          </div>
+      </div>
+    `;
+    commentWrapper.appendChild(commentDiv);
+  });
+  toggleLoadMoreButton(batch.hasMore);
 }
 
 document.getElementById('load-more-btn').onclick = function() {
-  if (currentCommentsVideoId && nextPageToken) {
-    displayComments(currentCommentsVideoId, nextPageToken, true);
-  }
+  loadMoreComments();
 };
 
 function toggleLoadMoreButton(show) {
