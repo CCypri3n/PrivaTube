@@ -12,7 +12,11 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 **Player page**: `video.html` + `web/VideoPlayer.js`. Reads `?v=<videoId>` (and optional `&t=<seconds>`), embeds the video via `youtube-nocookie.com`, and shows stats, description and comments.
 
-**Shorts filter**: Videos of 180 seconds or less, or tagged `#shorts`, are dropped from listings, as are livestreams/upcoming videos (duration `P0D`). Lives in `web/shorts.js` (pure, unit-tested); trending, search and channel listings share it and refill pages until ~24 items remain.
+**Shorts filter**: Videos of 180 seconds or less, or tagged `#shorts`, are dropped from listings, as are livestreams/upcoming videos (duration `P0D`). Lives in `web/shorts.js` (pure, unit-tested); the YouTube module (trending, search) and the channel listing share it and refill pages until ~24 items remain.
+
+**YouTube module**: `web/youtube.js`, exposed as the global `YouTube`. The only code that talks to the YouTube Data API. Created with the API key and a fetch-json function (`YouTube.create({ apiKey, fetchJson })`); no DOM, no `localStorage`. Returns simple items (videos with view count and duration in seconds, channels with subscriber count), applies the Shorts filter itself (`includeShorts` bypasses the Shorts rule only), and throws `YouTube.Failure` with a `reason`: `invalid_key`, `quota_exceeded`, `offline`, `not_found`, `other`. Step 1 of #10 covers trending and search; channels and the player page still fetch inline until steps 2 and 3.
+
+**Listing**: A browsable list from the YouTube module (`trending(region)`, `search(query)`). It remembers its own position; `more()` returns `{ items, hasMore }` for the next batch, refilled over a bounded number of requests toward about a full page (24), without duplicates. Replaces the shared `nextPageToken` global (still used by channel mode until step 2).
 
 **Comment sort**: `relevance` ("Top comments", default) or `time` ("Newest first"), passed to the `commentThreads` endpoint.
 
@@ -23,6 +27,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 - `index.html`, `video.html`: the two pages
 - `web/PrivaTube.js`, `web/VideoPlayer.js`: logic for each page (API-key handling is duplicated in both)
 - `web/shorts.js`: duration parser and Shorts predicate (also loaded by `tests/`)
+- `web/youtube.js`: the YouTube module (loaded after `shorts.js`, before `PrivaTube.js`; unit-tested with a fake fetch)
 - `web/styles.css`, `web/icons/`: shared styling and icons
 
 No build step or package manager. Pure logic is tested with `node --test tests/*.test.js`. To run, open `index.html` or serve the folder statically.
