@@ -26,49 +26,6 @@ function commentCountText() {
   return currentCommentCount ? `${currentCommentCount.toLocaleString('en-EN')} Comments` : 'N/A Comments';
 }
 
-function fetchApiKey() {
-  const storedKey = localStorage.getItem('api_key');
-  if (storedKey) {
-    return Promise.resolve(storedKey.trim());
-  }
-
-  return new Promise((resolve, reject) => {
-    // Show modal and set up event listener for save button
-    const modal = document.getElementById('api-key-modal');
-    const errorDiv = document.getElementById('api-key-error');
-    modal.style.display = 'flex';
-    document.getElementById('api-key-input').focus();
-
-    const onSave = async () => {
-      const api_key = document.getElementById('api-key-input').value.trim();
-      if (!api_key) {
-        errorDiv.textContent = "Please enter an API key.";
-        errorDiv.style.display = 'block';
-        return;
-      }
-      try {
-        const testResp = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${api_key}`
-        );
-        if (!testResp.ok) {
-          errorDiv.textContent = "Invalid API Key. Please try again.";
-          errorDiv.style.display = 'block';
-          return;
-        }
-        localStorage.setItem('api_key', api_key);
-        API_KEY = api_key;
-        modal.style.display = 'none';
-        document.getElementById('api-key-save-btn').removeEventListener('click', onSave);
-        resolve(api_key);
-      } catch (err) {
-        errorDiv.textContent = "Network error. Please try again.";
-        errorDiv.style.display = 'block';
-      }
-    };
-
-    document.getElementById('api-key-save-btn').addEventListener('click', onSave);
-  });
-}
 
 
 async function headerClick() {
@@ -203,14 +160,14 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     });
   });
   
-  fetchApiKey().then(key => {
+  ApiKey.getKey().then(key => {
   if (key && videoId) {
     API_KEY = key;
     playVideo(videoId)
   } else {
     closePlayer();
     }
-  // If key is missing/invalid, promptForApiKey() is already called inside fetchApiKey()
+  // If key is missing/invalid, ApiKey.getKey() keeps showing the popup until a key is accepted
   }).catch(err => {
     // Optional: log error, but don't show homepage
     console.error("API Key error:", err);

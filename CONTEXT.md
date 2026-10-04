@@ -4,7 +4,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 ## Language
 
-**API key**: The user's own YouTube Data API v3 key. Asked for in a modal on first load, validated with a test request, stored in `localStorage` under `api_key`. Never sent anywhere but Google.
+**API key**: The user's own YouTube Data API v3 key. Asked for in a modal on first load, validated with a test request, stored in `localStorage` under `api_key`. Never sent anywhere but Google. Handled only by `web/apikey.js` (`ApiKey.getKey()` / `ApiKey.clearKey()`); a key is accepted when Google says it is valid or that its quota is exceeded, and rejected (not saved) when invalid or on network error.
 
 **Home / search / channel mode**: The three states of the browse page (`index.html`, `web/PrivaTube.js`): trending videos for a region, search results (videos and channels), or a channel's uploads. State is carried in URL query params.
 
@@ -25,7 +25,8 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 ## Layout
 
 - `index.html`, `video.html`: the two pages
-- `web/PrivaTube.js`, `web/VideoPlayer.js`: logic for each page (API-key handling is duplicated in both)
+- `web/PrivaTube.js`, `web/VideoPlayer.js`: logic for each page
+- `web/apikey.js`: API key popup, check and storage behind `ApiKey.getKey()`; storage, fetch and UI are injectable (tested in `tests/apikey.test.js`)
 - `web/shorts.js`: duration parser and Shorts predicate (also loaded by `tests/`)
 - `web/youtube.js`: the YouTube module (loaded after `shorts.js`, before `PrivaTube.js`; unit-tested with a fake fetch)
 - `web/styles.css`, `web/icons/`: shared styling and icons
