@@ -67,12 +67,30 @@
 
     <div id="settings-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="api-key-modal-backdrop"></div>
-    <div class="api-key-modal-content">
-        <h2 id="settings-title">Settings</h2>
-        <label class="settings-row"><input type="checkbox" id="settings-shorts-toggle"> Show Shorts</label>
-        <button id="settings-forget-key-btn" class="settings-action-btn">Forget API key</button>
-        <button id="settings-close-btn" class="button" style="margin-top:12px;">Close</button>
-        <p class="attention" style="margin-top:8px;">Saved only in your browser.</p>
+    <div class="api-key-modal-content settings-card">
+        <div class="settings-head">
+            <h2 id="settings-title">Settings</h2>
+            <button id="settings-close-btn" class="settings-close" type="button" aria-label="Close settings" title="Close">&times;</button>
+        </div>
+        <div class="settings-group">
+            <label class="settings-row" for="settings-shorts-toggle">
+                <span class="settings-text">
+                    <span class="settings-label">Show Shorts</span>
+                    <span class="settings-hint">Include short vertical videos in lists</span>
+                </span>
+                <span class="switch">
+                    <input type="checkbox" role="switch" id="settings-shorts-toggle">
+                    <span class="switch-track" aria-hidden="true"></span>
+                </span>
+            </label>
+            <div class="settings-row">
+                <span class="settings-text">
+                    <span class="settings-label">API key</span>
+                    <span class="settings-hint">Stored only in this browser</span>
+                </span>
+                <button id="settings-forget-key-btn" class="settings-forget" type="button">Forget</button>
+            </div>
+        </div>
     </div>
     </div>
 

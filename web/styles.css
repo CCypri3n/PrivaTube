@@ -307,26 +307,143 @@ h1, h5 {
 body.video-playing .settings-btn:not(:hover) {
   opacity: 0.5;
 }
+/* --- Settings dialog --- */
+#settings-modal .settings-card {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  padding: 20px 20px 20px;
+  align-items: stretch;
+  text-align: left;
+}
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.settings-head h2 {
+  margin: 0;
+  font-size: 1.25em;
+}
+.settings-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cfcfcf;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-close:hover,
+.settings-close:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.settings-group {
+  background: #1a1a1a;
+  border-radius: 12px;
+  overflow: hidden;
+}
 .settings-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-  font-size: 1.05em;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+}
+.settings-row + .settings-row {
+  border-top: 1px solid #2c2c2c;
+}
+label.settings-row {
   cursor: pointer;
 }
-.settings-action-btn {
-  margin-top: 16px;
-  background: crimson;
-  color: #fff;
+.settings-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-label {
+  font-size: 1em;
+  color: #f4f4f4;
+}
+.settings-hint {
+  font-size: 0.8em;
+  color: #8a8a8a;
+}
+.settings-forget {
+  flex: none;
+  background: none;
   border: none;
+  color: #ff5a73;
+  font-size: 1em;
+  min-height: 44px;
+  padding: 0 4px;
   border-radius: 8px;
-  padding: 10px 28px;
-  font-size: 1.05em;
   cursor: pointer;
 }
-.settings-action-btn:hover {
-  background: #b8002f;
+.settings-forget:hover,
+.settings-forget:focus-visible {
+  color: #ff8aa0;
+  text-decoration: underline;
+}
+
+/* iOS-style switch: 51 x 31 track, 27 knob */
+.switch {
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 31px;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 31px;
+  background: #3a3a3c;
+  transition: background 0.2s;
+}
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+.switch input:checked + .switch-track {
+  background: crimson;
+}
+.switch input:checked + .switch-track::after {
+  transform: translateX(20px);
+}
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch-track,
+  .switch-track::after {
+    transition: none;
+  }
 }
 
 .country-list {
