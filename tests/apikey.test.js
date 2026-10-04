@@ -243,8 +243,10 @@ test('popup: Enter submits, other keys do not, listeners are removed afterwards'
   assert.strictEqual(modal.style.display, 'flex');
   assert.strictEqual(input.focused, true);
   input.value = 'good';
-  input.fire('keydown', { key: 'a' });
-  input.fire('keydown', { key: 'Enter' });
+  input.fire('keydown', { key: 'a', preventDefault() { throw new Error('only Enter'); } });
+  let prevented = false;
+  input.fire('keydown', { key: 'Enter', preventDefault() { prevented = true; } });
+  assert.strictEqual(prevented, true);
   assert.strictEqual(await p, 'good');
   assert.strictEqual(input.count('keydown'), 0);
   assert.strictEqual(btn.count('click'), 0);
@@ -270,11 +272,12 @@ test('popup opens with empty input and hidden error each time, errors persist be
     storage: fakeStorage(), doc,
     fetchFn: fakeFetch({ bad: apiError(400, 'keyInvalid'), good: ok })
   });
-  const settle = () => new Promise(r => setTimeout(r, 0));
+  const settle = async () => {
+    for (let i = 0; i < 50 && err.style.display !== 'block'; i++) await Promise.resolve();
+  };
   const p1 = api.getKey();
   input.value = 'bad';
   btn.fire('click');
-  await settle();
   await settle();
   assert.strictEqual(err.style.display, 'block'); // retry keeps the message visible
   input.value = 'good';
@@ -297,4 +300,30 @@ test('incomplete popup markup makes getKey reject with a clear error', async () 
     const api = ApiKey.create({ storage: fakeStorage(), doc: fakeDoc([id]), fetchFn: fakeFetch({}) });
     await assert.rejects(api.getKey(), err => err.message.includes(id), id);
   }
+});
+
+test('getKey never throws synchronously: a throwing storage becomes a rejection', async () => {
+  const storage = { getItem() { throw new Error('storage blocked'); }, setItem() {}, removeItem() {} };
+  const api = ApiKey.create({ storage, ui: fakeUI([]), fetchFn: fakeFetch({}) });
+  let p;
+  assert.doesNotThrow(() => { p = api.getKey(); });
+  await assert.rejects(p, /storage blocked/);
+});
+
+test('popup is closed when asking fails unexpectedly', async () => {
+  const ui = fakeUI([]); // ask() throws
+  const api = ApiKey.create({ storage: fakeStorage(), ui, fetchFn: fakeFetch({}) });
+  await assert.rejects(api.getKey());
+  assert.strictEqual(ui.opened, 1);
+  assert.strictEqual(ui.closed, true);
+});
+
+test('getKey works again after a rejection (pending is reset)', async () => {
+  const entries = [];
+  const ui = fakeUI(entries);
+  const api = ApiKey.create({ storage: fakeStorage(), ui, fetchFn: fakeFetch({ good: ok }) });
+  await assert.rejects(api.getKey());
+  entries.push('good');
+  assert.strictEqual(await api.getKey(), 'good');
+  assert.strictEqual(ui.opened, 2);
 });

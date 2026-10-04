@@ -10,6 +10,7 @@ One entry per commit, newest first. Each entry: date, commit subject, what chang
 - The `create` option `fetch` is renamed `fetchFn` so it no longer shadows the global (no callers passed it); `create` also takes an optional `doc`. `getKey`/`clearKey` unchanged.
 - Note for the #4 entry: pressing Enter in the key input now submits the popup (like clicking Save).
 - Tests: 5xx/503/500/429, concurrent calls, whitespace-only and padded saved values, Enter key, Save click and listener removal, reset on reopen, missing markup, via a tiny fake document. Not checked in a real browser (the issue's by-hand check with a real key is still to do).
+- Hardening after review: `getKey()` never throws synchronously (a throwing storage becomes a rejection); the popup is closed if asking or checking fails unexpectedly; Enter calls `preventDefault()`; `ask()` no longer re-validates markup that `open()` checked. Tests added for these and for `getKey()` working again after a rejection; the reset-on-reopen test no longer relies on timers.
 - Closes #19.
 
 ## 2026-10-04 — API key module: shared popup, check and storage (closes #4)

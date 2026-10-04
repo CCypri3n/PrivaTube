@@ -59,17 +59,22 @@ const ApiKey = (function () {
         el('api-key-error').style.display = 'none';
         el('api-key-modal').style.display = 'flex';
       },
+      // Call after open(), which already validated the markup.
       ask() {
         return new Promise(resolve => {
-          const input = el('api-key-input');
-          const btn = el('api-key-save-btn');
+          const input = d().getElementById('api-key-input');
+          const btn = d().getElementById('api-key-save-btn');
           input.focus();
           const done = () => {
             btn.removeEventListener('click', done);
             input.removeEventListener('keydown', onKey);
             resolve(input.value);
           };
-          const onKey = e => { if (e.key === 'Enter') done(); };
+          const onKey = e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            done();
+          };
           btn.addEventListener('click', done);
           input.addEventListener('keydown', onKey);
         });
@@ -97,32 +102,37 @@ const ApiKey = (function () {
     let pending = null; // the one in-flight popup session, shared by concurrent callers
 
     async function askUntilAccepted() {
+      const saved = store().getItem(STORAGE_NAME);
+      if (saved && saved.trim()) return saved.trim();
+
       const view = getUI();
       view.open();
-      for (;;) {
-        const key = ((await view.ask()) || '').trim();
-        if (!key) {
-          view.showError('Please enter an API key.');
-          continue;
+      try {
+        for (;;) {
+          const key = ((await view.ask()) || '').trim();
+          if (!key) {
+            view.showError('Please enter an API key.');
+            continue;
+          }
+          const result = await checkKey(net, key);
+          if (result === 'accepted') {
+            store().setItem(STORAGE_NAME, key);
+            view.hideError();
+            return key;
+          }
+          view.showError(
+            result === 'try-again'
+              ? 'Could not check the key right now. Please try again in a moment.'
+              : 'Invalid API Key. Please try again.'
+          );
         }
-        const result = await checkKey(net, key);
-        if (result === 'accepted') {
-          store().setItem(STORAGE_NAME, key);
-          view.hideError();
-          view.close();
-          return key;
-        }
-        view.showError(
-          result === 'try-again'
-            ? 'Could not check the key right now. Please try again in a moment.'
-            : 'Invalid API Key. Please try again.'
-        );
+      } finally {
+        view.close(); // also on unexpected failure, so no stale modal remains
       }
     }
 
     function getKey() {
-      const saved = store().getItem(STORAGE_NAME);
-      if (saved && saved.trim()) return Promise.resolve(saved.trim());
+      // Never throws synchronously: storage errors become rejections.
       if (!pending) {
         pending = askUntilAccepted().finally(() => { pending = null; });
       }
