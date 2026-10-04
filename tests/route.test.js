@@ -49,6 +49,11 @@ test('parse: q decoding matches the page (encodeURIComponent inside the param)',
   await t.test('double-encoded q (as the index page writes it) gives the typed text', () => {
     assert.equal(Route.parse('?q=' + encodeURIComponent(encodeURIComponent('a b&c'))).query, 'a b&c');
   });
+  await t.test('once-encoded and old double-encoded AT&T both parse to AT&T', () => {
+    assert.equal(Route.parse('?q=AT%26T').query, 'AT&T');
+    assert.equal(Route.parse('?q=AT%2526T').query, 'AT&T');
+    assert.equal(Route.parse('?q=AT%26T').mode, 'search');
+  });
   await t.test('single-encoded q (old player page links) still works', () => {
     assert.equal(Route.parse('?q=a%20b').query, 'a b');
   });
@@ -93,10 +98,32 @@ test('hrefs', async (t) => {
     assert.equal(Route.video('V1', { t: null }), 'video.html?v=V1&lang=FR');
     assert.equal(Route.video('V1', { t: 'junk' }), 'video.html?v=V1&lang=FR');
   });
-  await t.test('search encodes q the way the index page does today', () => {
-    const href = Route.search('a b&c', { region: 'ES' });
-    const expected = new URLSearchParams({ q: encodeURIComponent('a b&c') }).toString() + '&lang=ES';
-    assert.equal(href, 'index.html?' + expected);
+  await t.test('search stores the text once-encoded (AT&T -> AT%26T, not AT%2526T)', () => {
+    assert.equal(Route.search('AT&T', { region: 'ES' }), 'index.html?q=AT%26T&lang=ES');
+    assert.equal(Route.search('a b'), 'index.html?q=a+b&lang=FR');
+  });
+  await t.test('search href parses back to the typed text', () => {
+    ['AT&T', 'a b&c', 'cafe \u00e9', '50%', '100%', 'x=y?z#w'].forEach((text) => {
+      assert.equal(Route.parse(Route.search(text)).query, text);
+    });
+  });
+  await t.test('known limit: text that already looks like an escape reads back decoded', () => {
+    // Needed so old double-encoded addresses keep parsing; accepted trade-off.
+    assert.equal(Route.search('a%20b'), 'index.html?q=a%2520b&lang=FR');
+    assert.equal(Route.parse(Route.search('a%20b')).query, 'a b');
+    assert.equal(Route.parse(Route.search('50%25')).query, '50%');
+  });
+  await t.test('shared-link startup redirect keeps t (explicit), region from the address', () => {
+    const start = Route.parse('?v=X&lang=DE&t=90');
+    assert.equal(Route.video(start.videoId, { region: start.region, t: start.t }), 'video.html?v=X&lang=DE&t=90');
+    const noT = Route.parse('?v=X&lang=DE');
+    assert.equal(Route.video(noT.videoId, { region: noT.region, t: noT.t }), 'video.html?v=X&lang=DE');
+  });
+  await t.test('listing video links carry t only when passed explicitly', () => {
+    const current = Route.parse('?v=X&lang=DE&t=90');
+    assert.equal(Route.video('V1', { region: current.region }), 'video.html?v=V1&lang=DE');
+    assert.equal(Route.video('V1', { region: current.region, t: 90 }), 'video.html?v=V1&lang=DE&t=90');
+    assert.equal(Route.channel('UC1', { region: current.region }), 'index.html?ch=UC1&lang=DE');
   });
   await t.test('share link points at the Pages site, includes t when present', () => {
     assert.equal(Route.share('V1'), 'https://ccypri3n.github.io/PrivaTube/?v=V1');
@@ -132,5 +159,27 @@ test('href(route) and round-trips', async (t) => {
     assert.deepEqual([v.mode, v.videoId, v.region, v.t], ['video', 'vid', 'GB', 12]);
     const h = Route.parse(Route.home({ region: 'ES' }));
     assert.deepEqual([h.mode, h.region], ['home', 'ES']);
+  });
+});
+
+test('addressChange: skip, replace or push before a render', async (t) => {
+  await t.test('Back/Forward and load-more never write', () => {
+    assert.equal(Route.addressChange('?ch=C&lang=FR', 'index.html?lang=FR', { restoring: true }), 'skip');
+    assert.equal(Route.addressChange('?lang=FR', 'index.html?lang=FR', { loadMore: true }), 'skip');
+  });
+  await t.test('identical address: skip', () => {
+    assert.equal(Route.addressChange('?q=AT%26T&lang=FR', Route.search('AT&T'), {}), 'skip');
+    assert.equal(Route.addressChange('?q=AT%26T&lang=FR', Route.search('AT&T'), { initial: true }), 'skip');
+  });
+  await t.test('same view spelled differently (bare, old-encoded, reordered): replace, never push', () => {
+    assert.equal(Route.addressChange('', Route.home({ region: 'FR' }), {}), 'replace');
+    assert.equal(Route.addressChange('?q=AT%2526T&lang=FR', Route.search('AT&T'), {}), 'replace');
+    assert.equal(Route.addressChange('?lang=ES&q=x', Route.search('x', { region: 'ES' }), {}), 'replace');
+  });
+  await t.test('a different view pushes, except the first render at startup', () => {
+    assert.equal(Route.addressChange('?lang=FR', Route.channel('C'), {}), 'push');
+    assert.equal(Route.addressChange('?lang=FR', Route.search('x'), {}), 'push');
+    assert.equal(Route.addressChange('?lang=FR', Route.channel('C', { region: 'DE' }), {}), 'push');
+    assert.equal(Route.addressChange('?lang=FR', Route.channel('C'), { initial: true }), 'replace');
   });
 });
