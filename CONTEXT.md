@@ -20,13 +20,16 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 **Comment sort**: `relevance` ("Top comments", default) or `time` ("Newest first"), passed to the `commentThreads` endpoint.
 
-**Share link**: A `video.html?v=<id>` URL pointing back at PrivaTube rather than YouTube. Links in descriptions and comments are rewritten the same way.
+**Route module**: `web/route.js`, global `Route`, pure (no DOM). The only code that knows the URL format. `Route.parse(search or href)` gives `{ mode, region, videoId, channelId, query, t }` (mode precedence `v` over `q` over `ch`, else home; region defaults to `FR`; `query` is decoded text). Builders `home`, `channel`, `video` (optional `t`), `search`, `href(route)` and `share` return hrefs. Handlers call it instead of using `URLSearchParams`.
+
+**Share link**: A URL pointing back at PrivaTube rather than YouTube (the Pages site, `?v=<id>`, plus `&t=` when the player has a timecode; built by `Route.share`). Links in descriptions and comments are rewritten the same way.
 
 ## Layout
 
 - `index.html`, `video.html`: the two pages
 - `web/PrivaTube.js`, `web/VideoPlayer.js`: logic for each page
 - `web/apikey.js`: API key popup, check and storage behind `ApiKey.getKey()`; storage, fetch and UI are injectable (tested in `tests/apikey.test.js`)
+- `web/route.js`: the Route module (loaded by both pages before the page scripts; tested in `tests/route.test.js`)
 - `web/shorts.js`: duration parser and Shorts predicate (also loaded by `tests/`)
 - `web/youtube.js`: the YouTube module (loaded after `shorts.js`, before `PrivaTube.js`; unit-tested with a fake fetch)
 - `web/styles.css`, `web/icons/`: shared styling and icons

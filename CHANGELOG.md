@@ -2,6 +2,11 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-05 — Route module: one place for URL state (closes #5)
+- New pure `web/route.js` (`Route.parse`, `home`, `channel`, `video`, `search`, `href`, `share`), loaded by both pages before the page scripts; tested in `tests/route.test.js`. Mode precedence is `v`, then `q`, then `ch`, else home; region defaults to `FR` in one place; `t` is kept only as a non-negative integer.
+- `web/PrivaTube.js` and `web/VideoPlayer.js` no longer touch `URLSearchParams`: removed the per-handler param clearing, the four `lang=FR` defaults, both copies of `createVideoUrl`/`createChannelUrl`, the mode derivation (country select and page load) and the hardcoded share link, which now keeps `t`.
+- Behaviour changes: navigating to a channel drops `q` and `t` (a leftover `q` made a reload show search); going home drops other params and writes `lang` in one history entry; searching from the player page now encodes `q` like the browse page does; timecode links in descriptions carry the region; invalid `t` (non-integer) is ignored.
+
 ## 2026-10-04 — API key module: shared popup, check and storage (closes #4)
 - New `web/apikey.js` (`ApiKey.getKey()`, `ApiKey.clearKey()`, `ApiKey.create({ storage, fetch, ui })`); loaded by both pages before the page scripts. Deleted the duplicated `fetchApiKey` from `web/PrivaTube.js` and `web/VideoPlayer.js`.
 - The check now distinguishes rejected (invalid message, not saved), quota exceeded (key is valid: saved) and network error (network message, not saved); the error is hidden on the next success.

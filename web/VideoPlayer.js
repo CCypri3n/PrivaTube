@@ -65,37 +65,17 @@ async function headerClick() {
 }
 
 async function showHomepage() {
-    // GO TO index.html with updated URL
-    const url = new URL(window.location);
-    url.searchParams.delete('ch');
-    url.searchParams.delete('v');
-    url.searchParams.delete('t');
-    url.searchParams.delete('q');
-    const lang = url.searchParams.get('lang');
-    if (!lang) {
-        url.searchParams.set('lang', 'FR'); // Default to 'FR' if no lang param
-        // Open URL in same tab
-        window.location.href = "index.html?" + url.searchParams.toString();
-    } else {
-        lastRegionCode = lang;
-    }
-    // Set the region code in the button
-    // Open URL in same tab
-    window.location.href = "index.html?" + url.searchParams.toString();
+    // GO TO index.html in the same tab, keeping the region
+    lastRegionCode = Route.parse(window.location.search).region;
+    window.location.href = Route.home({ region: lastRegionCode });
 }
 
 
 async function searchVideos(query) {
-    // Implement search logic with search args in URL
+    // Search happens on the browse page: go there with the query in the URL
     closePlayer();
-    const url = new URL(window.location);
-    url.searchParams.delete('v');
-    url.searchParams.delete('t');
-    url.searchParams.delete('ch');
-    queryFromField = document.getElementById('searchQuery').value.trim();
-    console.log("Search query from field:", queryFromField);
-    url.searchParams.set('q', queryFromField);
-    window.location.href = "index.html?" + url.searchParams.toString();
+    const queryFromField = document.getElementById('searchQuery').value.trim();
+    window.location.href = Route.search(queryFromField, Route.parse(window.location.search));
 }
 
 
@@ -105,9 +85,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const list = document.getElementById('country-list');
   const mainHeader = document.getElementById('main-header-link');
   const copyBtn = document.getElementById('copy-share-link-btn');
-  const params = new URLSearchParams(window.location.search);
-  const lang = params.get('lang');
-  const videoId = params.get('v');
+  const startRoute = Route.parse(window.location.search);
+  const videoId = startRoute.videoId;
   const searchBtn = document.getElementById('search-btn');
   const shareBtn = document.getElementById('share-btn');
   const shareModal = document.getElementById('share-modal');
@@ -154,9 +133,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     commentSortBtn.classList.remove('active');
   });
 
-  if (lang) {
-    lastRegionCode = lang;
-  } mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
+  lastRegionCode = startRoute.region;
+  mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
   // Update the button display
   if (btn) {
     btn.innerHTML = `${lastRegionCode} ▼`;
@@ -170,10 +148,9 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     list.style.display = 'none';
     btn.classList.remove('active');
     lastRegionCode = code;
-    const url = new URL(window.location);
-    url.searchParams.set('lang', lastRegionCode);
-    window.history.replaceState({}, '', url);
-    mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
+    const route = { ...Route.parse(window.location.search), region: lastRegionCode };
+    window.history.replaceState({}, '', Route.href(route));
+    mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
     });
  });
   // Handle sort selection
@@ -214,8 +191,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   if (shareBtn && shareModal && shareLink && shareCloseBtn) {
     shareBtn.onclick = function() {
       if (!lastPlayedVideoId) return;
-      const shareUrl = `https://ccypri3n.github.io/PrivaTube/?v=${lastPlayedVideoId}`;
-      shareLink.value = shareUrl;
+      shareLink.value = Route.share(lastPlayedVideoId, { t: Route.parse(window.location.search).t });
       shareModal.style.display = 'flex';
       shareLink.select();
     };
@@ -308,7 +284,7 @@ async function videoInfoShow(videoId) {
       document.getElementById('channel-avatar').src = channel.avatar;
       document.getElementById('channel-avatar').alt = channel.title;
       document.getElementById('channel-avatar').style.cursor = "pointer";
-      document.getElementById('channel-link').href = createChannelUrl(channel.id);
+      document.getElementById('channel-link').href = Route.channel(channel.id, Route.parse(window.location.search));
       document.getElementById('channel-subscribers').textContent =
         channel.subscriberCount
           ? `${channel.subscriberCount.toLocaleString()} subscribers`
@@ -348,16 +324,12 @@ async function playVideo(videoId) {
   window.scrollTo(0, 0);
   lastPlayedVideoId = videoId; // Track for sharing
   document.body.classList.add('video-playing');
-  const url = new URL(window.location);
-  url.searchParams.delete('ch');
-  url.searchParams.delete('q');
-  url.searchParams.set('v', videoId);
-  const time = url.searchParams.get('t');
-  // Use pushState to update URL without reloading
-  window.history.replaceState({}, '', url);
+  const route = Route.parse(window.location.search);
+  // Update the URL without reloading
+  window.history.replaceState({}, '', Route.video(videoId, route));
   let videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
-  if (time && !isNaN(Number(time))) {
-    videoUrl += `?start=${Number(time)}`;
+  if (route.t !== null) {
+    videoUrl += `?start=${route.t}`;
   }
   const playerDiv = document.getElementById('video');
   const resultsDiv = document.getElementById('results');
@@ -391,17 +363,6 @@ function closePlayer() {
   if (bannerDiv) bannerDiv.style.display = '';
   if (videoInfoDiv) videoInfoDiv.style.display = 'none'; // <-- Hide info
   videoInfoShow(false);
-}
-
-function createChannelUrl(channelId) {
-  const url = new URL(window.location);
-  const lang = url.searchParams.get('lang') || "FR";
-  let params = new URLSearchParams();
-  params.set('ch', channelId);
-  params.set('lang', lang);
-  console.log("Channel URL with params:", params.toString());
-  channelUrl = "index.html?" + params.toString();
-  return(channelUrl);
 }
 
 function youtubeDescriptiontoPrivaTube(description) {
@@ -443,7 +404,7 @@ function youtubeDescriptiontoPrivaTube(description) {
     } else {
       seconds = parts[0]; // Just in case
     }
-    return `<a href="video.html?v=${lastPlayedVideoId}&t=${seconds}">${match}</a>`;
+    return `<a href="${Route.video(lastPlayedVideoId, { region: Route.parse(window.location.search).region, t: seconds })}">${match}</a>`;
   });
 
   return linkify(description);
@@ -525,7 +486,7 @@ async function loadMoreComments(first = false) {
   }
   batch.items.forEach(comment => {
     const commentDiv = document.createElement('div');
-    const channelUrl = comment.authorChannelId ? createChannelUrl(comment.authorChannelId) : '';
+    const channelUrl = comment.authorChannelId ? Route.channel(comment.authorChannelId, Route.parse(window.location.search)) : '';
     const rawText = comment.text;
     if (!rawText) {
       console.warn("Comment text is empty, skipping:", comment);

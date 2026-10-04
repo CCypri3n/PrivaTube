@@ -39,21 +39,8 @@ async function headerClick() {
 async function showHomepage(loadMore = false) {
   currentMode = 'home';
   document.getElementById('channel-banner').style.display = 'none';
-  const url = new URL(window.location);
-  url.searchParams.delete('ch');
-  url.searchParams.delete('v'); // Remove video param when going to homepage
-  url.searchParams.delete('q'); // Remove search param when going to homepage
-  window.history.pushState({}, '', url);
-  const params = new URLSearchParams(window.location.search);
-  const lang = params.get('lang');
-  if (!lang) {
-    lastRegionCode = 'FR';
-    const url = new URL(window.location);
-    url.searchParams.set('lang', lastRegionCode);
-    window.history.replaceState({}, '', url); // Use replaceState to avoid history spam
-  } else {
-    lastRegionCode = lang;
-  }
+  lastRegionCode = Route.parse(window.location.search).region;
+  window.history.pushState({}, '', Route.home({ region: lastRegionCode }));
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading trending videos...</p>";
@@ -72,31 +59,17 @@ async function showHomepage(loadMore = false) {
 
 // --- Search Videos ---
 async function searchVideos(loadMore = false) {
-  const url = new URL(window.location);
-  url.searchParams.delete('ch');
-  url.searchParams.delete('v'); // Remove video param when going to homepage
-  url.searchParams.delete('t'); // Remove time param when going to search
-  window.history.pushState({}, '', url);
+  const route = Route.parse(window.location.search);
+  // The typed text, from the address (set by the caller) or else the search box.
+  const query = route.query || document.getElementById('searchQuery').value.trim();
   document.getElementById('channel-banner').style.display = 'none';
-  let query = url.searchParams.get('q');
-  console.log("Search query from URL:", query);
-  if (!query) {
-    const queryFromField = document.getElementById('searchQuery').value.trim();
-    console.log("Search query from field:", queryFromField);
-    url.searchParams.set('q', queryFromField);
-    window.history.replaceState({}, '', url);
-    query = url.searchParams.get('q');
-    console.log("Search query from URL:", query);
-  }
-  if (!query || !query.trim()) return;
+  if (!query.trim()) return;
+  window.history.pushState({}, '', Route.search(query, route));
   currentMode = 'search';
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Searching...</p>";
-    // The q param holds an already-encoded string; the module encodes it itself.
-    let text = query;
-    try { text = decodeURIComponent(query); } catch (e) { /* use as typed */ }
-    listing = getYouTube().search(text);
+    listing = getYouTube().search(query);
   }
   try {
     const { items, hasMore } = await listing.more();
@@ -115,10 +88,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   window.scrollTo(0, 0);
   currentMode = 'channel';
   lastChannelId = channelId;
-  const url = new URL(window.location);
-  url.searchParams.set('ch', channelId);
-  url.searchParams.delete('v'); // Remove video param when going to channel
-  window.history.pushState({}, '', url);
+  window.history.pushState({}, '', Route.channel(channelId, Route.parse(window.location.search)));
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
   const yt = getYouTube();
@@ -185,7 +155,7 @@ function renderItem(item) {
       : '';
     return `
         <div class="video-item">
-            <a href="${createVideoUrl(item.id)}" target="_self">
+            <a href="${Route.video(item.id, Route.parse(window.location.search))}" target="_self">
               <div class="video-thumb-container">
                 <img src="${item.thumbnail}" alt="${item.title}" />
                 <span class="video-duration">${formatSeconds(item.duration)}</span>
@@ -195,7 +165,7 @@ function renderItem(item) {
             <div class="video-meta">
             <span class="video-date">${dateStr}</span>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
-            <a href="${createChannelUrl(item.channelId)}" class="channel-link" target="_self">
+            <a href="${Route.channel(item.channelId, Route.parse(window.location.search))}" class="channel-link" target="_self">
                 ${item.channelTitle}
             </a>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
@@ -207,7 +177,7 @@ function renderItem(item) {
         `;
   } else if (item.kind === 'channel') {
     return `
-    <a href="${createChannelUrl(item.id)}" target="_self">
+    <a href="${Route.channel(item.id, Route.parse(window.location.search))}" target="_self">
       <div class="channel-item" data-channel-id="${item.id}" onclick="fetchChannelVideos('${item.id}')">
         <img src="${item.thumbnail}" alt="${item.title}" />
         <h3>${item.title}</h3>
@@ -237,9 +207,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
   input.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
-      const url = new URL(window.location);
-      url.searchParams.set('q', encodeURIComponent(input.value.trim()));
-      window.history.pushState({}, '', url);
+      window.history.pushState({}, '', Route.search(input.value.trim(), Route.parse(window.location.search)));
       searchVideos();
     }
   });
@@ -258,11 +226,9 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     btn.classList.remove('active');
   });
 
-  const params = new URLSearchParams(window.location.search);
-  const lang = params.get('lang');
-  if (lang) {
-    lastRegionCode = lang;
-  } mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
+  const startRoute = Route.parse(window.location.search);
+  lastRegionCode = startRoute.region;
+  mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
   document.title = `PrivaTube - ${lastRegionCode}`;
   // Update the button display
   if (btn) {
@@ -277,22 +243,21 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     list.style.display = 'none';
     btn.classList.remove('active');
     lastRegionCode = code;
-    const url = new URL(window.location);
-    url.searchParams.set('lang', lastRegionCode);
-    mainHeader.href = "index.html?lang=" + lastRegionCode; // Update header link to include region code
+    const route = { ...Route.parse(window.location.search), region: code };
+    mainHeader.href = Route.home({ region: code }); // Update header link to include region code
     document.title = `PrivaTube - ${lastRegionCode}`;
     // Go to the correct mode based on URL parameters
-    if (!url.searchParams.get('ch') && !url.searchParams.get('v') && !url.searchParams.get('q')) {
-      window.history.replaceState({}, '', url);
+    if (route.mode === 'home') {
+      window.history.replaceState({}, '', Route.href(route));
       showHomepage();
     } else {
-      window.history.pushState({}, '', url);
-      if (url.searchParams.get('v')) {
-        playVideo(url.searchParams.get('v'));
-      } else if (url.searchParams.get('q')) {
+      window.history.pushState({}, '', Route.href(route));
+      if (route.mode === 'video') {
+        playVideo(route.videoId);
+      } else if (route.mode === 'search') {
         searchVideos();
-      } else if (url.searchParams.get('ch')) {
-        fetchChannelVideos(url.searchParams.get('ch'));
+      } else if (route.mode === 'channel') {
+        fetchChannelVideos(route.channelId);
       }
   }});
   });
@@ -308,18 +273,15 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   });
 
   // Only start app after API key is loaded!
-  const videoId = params.get('v');
-  const channel = params.get('ch');
-  const query = params.get('q');
   ApiKey.getKey().then(key => {
   if (key) {
     API_KEY = key;
-    if (videoId) {
-      playVideo(videoId);
-    } else if (query) {
+    if (startRoute.mode === 'video') {
+      playVideo(startRoute.videoId);
+    } else if (startRoute.mode === 'search') {
       searchVideos(false)
-    } else if (channel) {
-      fetchChannelVideos(channel);
+    } else if (startRoute.mode === 'channel') {
+      fetchChannelVideos(startRoute.channelId);
     } else {
     showHomepage();
     }
@@ -333,9 +295,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const searchBtn = document.getElementById('search-btn');
   if (searchBtn) {
     searchBtn.addEventListener('click', function() {
-      const url = new URL(window.location);
-      url.searchParams.set('q', encodeURIComponent(input.value.trim()));
-      window.history.pushState({}, '', url);
+      window.history.pushState({}, '', Route.search(input.value.trim(), Route.parse(window.location.search)));
       searchVideos();
     });
   }
@@ -344,38 +304,5 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
 async function playVideo(videoId) {
   window.scrollTo(0, 0);
-  const url = new URL(window.location);
-  const lang = url.searchParams.get('lang') || "FR";
-  let params = new URLSearchParams();
-  params.set('v', videoId);
-  params.set('lang', lang);
-  // Add t param if present
-  const t = url.searchParams.get('t');
-  if (t) params.set('t', t);
-  window.location.href = "video.html?" + params.toString();
-}
-
-function createVideoUrl(videoId) {
-  const url = new URL(window.location);
-  const lang = url.searchParams.get('lang') || "FR";
-  let params = new URLSearchParams();
-  params.set('v', videoId);
-  params.set('lang', lang);
-  // Add t param if present
-  const t = url.searchParams.get('t');
-  if (t) params.set('t', t);
-  console.log("Video URL with params:", params.toString());
-  videoUrl = "video.html?" + params.toString();
-  return(videoUrl);
-}
-
-function createChannelUrl(channelId) {
-  const url = new URL(window.location);
-  const lang = url.searchParams.get('lang') || "FR";
-  let params = new URLSearchParams();
-  params.set('ch', channelId);
-  params.set('lang', lang);
-  console.log("Channel URL with params:", params.toString());
-  channelUrl = "index.html?" + params.toString();
-  return(channelUrl);
+  window.location.href = Route.video(videoId, Route.parse(window.location.search));
 }
