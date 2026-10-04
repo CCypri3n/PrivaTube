@@ -22,6 +22,37 @@ function messageForFailure(error, fallback) {
   return fallback;
 }
 
+// Load-failure area: one message, with the video details hidden and emptied.
+const DETAIL_IDS = ['video-info', 'video-stats', 'comment-action-wrapper'];
+const DETAIL_TEXT_IDS = ['video-title', 'video-description', 'view-count', 'video-published-date',
+  'channel-name', 'channel-subscribers', 'channel-likes', 'comment-count'];
+
+function clearLoadError({ restoreDetails = false } = {}) {
+  const errorDiv = document.getElementById('video-error');
+  errorDiv.textContent = '';
+  errorDiv.style.display = 'none';
+  if (!restoreDetails) return;
+  DETAIL_IDS.forEach(id => { document.getElementById(id).style.display = ''; });
+  document.getElementById('video-info').style.display = 'block';
+}
+
+function showLoadError(error) {
+  const message = (error && error.reason === 'not_found')
+    ? 'Video not found.'
+    : messageForFailure(error, 'Could not load this video.');
+  DETAIL_IDS.forEach(id => { document.getElementById(id).style.display = 'none'; });
+  DETAIL_TEXT_IDS.forEach(id => { document.getElementById(id).textContent = ''; });
+  document.getElementById('video-description').innerHTML = '';
+  document.getElementById('channel-avatar').src = '';
+  document.getElementById('comment-wrapper').innerHTML = '';
+  toggleLoadMoreButton(false);
+  currentComments = null;
+  currentCommentsVideoId = null;
+  const errorDiv = document.getElementById('video-error');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+}
+
 function commentCountText() {
   return currentCommentCount ? `${currentCommentCount.toLocaleString('en-EN')} Comments` : 'N/A Comments';
 }
@@ -287,6 +318,7 @@ async function videoInfoShow(videoId) {
     let video = null;
     try {
       video = await youtube().video(videoId);
+      clearLoadError({ restoreDetails: true });
       document.getElementById('video-title').textContent = video.title;
       document.getElementById('video-description').innerHTML = youtubeDescriptiontoPrivaTube(video.description);
       document.getElementById('view-count').innerHTML = video.viewCount
@@ -304,10 +336,8 @@ async function videoInfoShow(videoId) {
       document.getElementById("comment-count").textContent = commentCountText();
     } catch (err) {
       console.error("Error fetching video info:", err);
-      document.getElementById('video-title').textContent = messageForFailure(err, 'Video Title');
-      document.getElementById('video-description').textContent = 'Video description will appear here.';
-      document.getElementById('view-count').textContent = 'Views: N/A';
-      video = null;
+      showLoadError(err);
+      return;
     }
 
     if (video && video.channel) {
@@ -341,6 +371,7 @@ async function videoInfoShow(videoId) {
       document.getElementById('channel-subscribers').textContent = '';
     }
   } else {
+    clearLoadError();
     document.getElementById('video-title').textContent = "";
     document.getElementById('video-description').textContent = "";
     document.getElementById('video-description').innerHTML = "";
@@ -519,7 +550,13 @@ async function loadMoreComments(first = false) {
   } catch (err) {
     if (list !== currentComments) return; // sort changed meanwhile
     console.error("Error fetching comments:", err);
-    if (first) commentWrapper.textContent = messageForFailure(err, 'Error loading comments.');
+    if (first) {
+      commentWrapper.innerHTML = '';
+      const msg = document.createElement('div');
+      msg.className = 'video-error';
+      msg.textContent = messageForFailure(err, 'Error loading comments.');
+      commentWrapper.appendChild(msg);
+    }
     else toggleLoadMoreButton(true); // allow retry
     return;
   }
