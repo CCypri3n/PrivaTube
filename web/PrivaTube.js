@@ -55,15 +55,23 @@ function syncRegionUI(region) {
 function currentRegion() {
   return { region: Route.parse(window.location.search).region };
 }
+// True during the first render at startup: it must replace, not add, an entry.
+let initialRender = false;
 function pushAddress(href, loadMore) {
-  if (restoringFromHistory || loadMore) return;
-  if (new URL(href, window.location.href).href === window.location.href) return; // same address: no duplicate entry
-  window.history.pushState({}, '', href);
+  const action = Route.addressChange(window.location.search, href,
+    { restoring: restoringFromHistory, loadMore, initial: initialRender });
+  if (action === 'push') window.history.pushState({}, '', href);
+  else if (action === 'replace') window.history.replaceState({}, '', href);
 }
 
 // Back/Forward: render the mode the address now describes, without pushing.
 // (The player page is a separate document, so 'video' never lands here.)
 function renderFromAddress() {
+  // Any navigation invalidates in-flight renders, even one that renders nothing.
+  renderGeneration++;
+  // Before the key is known (popup showing) there is nothing to render; startup
+  // renders from whatever the address is once the key is accepted.
+  if (!API_KEY) return;
   const route = Route.parse(window.location.search);
   syncRegionUI(route.region);
   const box = document.getElementById('searchQuery');
@@ -333,14 +341,22 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   ApiKey.getKey().then(key => {
   if (key) {
     API_KEY = key;
-    if (startRoute.mode === 'video') {
-      playVideo(startRoute.videoId, { t: startRoute.t }); // shared link: keep its timecode
-    } else if (startRoute.mode === 'search') {
-      searchVideos(false)
-    } else if (startRoute.mode === 'channel') {
-      fetchChannelVideos(startRoute.channelId);
-    } else {
-    showHomepage();
+    // Read the address now: Back/Forward may have moved it while the popup was up.
+    const route = Route.parse(window.location.search);
+    syncRegionUI(route.region);
+    initialRender = true; // pushes are synchronous, before the first await
+    try {
+      if (route.mode === 'video') {
+        playVideo(route.videoId, { t: route.t }); // shared link: keep its timecode
+      } else if (route.mode === 'search') {
+        searchVideos(false)
+      } else if (route.mode === 'channel') {
+        fetchChannelVideos(route.channelId);
+      } else {
+        showHomepage();
+      }
+    } finally {
+      initialRender = false;
     }
   }
   // If key is missing/invalid, ApiKey.getKey() keeps showing the popup until a key is accepted

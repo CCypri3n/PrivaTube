@@ -161,3 +161,25 @@ test('href(route) and round-trips', async (t) => {
     assert.deepEqual([h.mode, h.region], ['home', 'ES']);
   });
 });
+
+test('addressChange: skip, replace or push before a render', async (t) => {
+  await t.test('Back/Forward and load-more never write', () => {
+    assert.equal(Route.addressChange('?ch=C&lang=FR', 'index.html?lang=FR', { restoring: true }), 'skip');
+    assert.equal(Route.addressChange('?lang=FR', 'index.html?lang=FR', { loadMore: true }), 'skip');
+  });
+  await t.test('identical address: skip', () => {
+    assert.equal(Route.addressChange('?q=AT%26T&lang=FR', Route.search('AT&T'), {}), 'skip');
+    assert.equal(Route.addressChange('?q=AT%26T&lang=FR', Route.search('AT&T'), { initial: true }), 'skip');
+  });
+  await t.test('same view spelled differently (bare, old-encoded, reordered): replace, never push', () => {
+    assert.equal(Route.addressChange('', Route.home({ region: 'FR' }), {}), 'replace');
+    assert.equal(Route.addressChange('?q=AT%2526T&lang=FR', Route.search('AT&T'), {}), 'replace');
+    assert.equal(Route.addressChange('?lang=ES&q=x', Route.search('x', { region: 'ES' }), {}), 'replace');
+  });
+  await t.test('a different view pushes, except the first render at startup', () => {
+    assert.equal(Route.addressChange('?lang=FR', Route.channel('C'), {}), 'push');
+    assert.equal(Route.addressChange('?lang=FR', Route.search('x'), {}), 'push');
+    assert.equal(Route.addressChange('?lang=FR', Route.channel('C', { region: 'DE' }), {}), 'push');
+    assert.equal(Route.addressChange('?lang=FR', Route.channel('C'), { initial: true }), 'replace');
+  });
+});

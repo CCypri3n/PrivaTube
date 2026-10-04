@@ -11,6 +11,7 @@
  *   non-negative integer (seconds) or null. Empty/junk params are ignored.
  * Route.home / channel / video / search / href build hrefs (relative to the
  * pages); Route.share builds the link to give to other people.
+ * Route.addressChange(currentSearch, targetHref, flags) -> 'skip' | 'replace' | 'push'.
  * Builders take { region, t } options, so a parsed route can be passed as is.
  */
 const Route = (function () {
@@ -96,7 +97,26 @@ const Route = (function () {
     return base + '?' + build('', [['v', videoId]]).slice(1) + (t !== null ? '&t=' + t : '');
   }
 
-  return { parse, home, channel, video, search, href, share, DEFAULT_REGION };
+  function sameRoute(a, b) {
+    return ['mode', 'region', 'videoId', 'channelId', 'query', 't'].every((k) => a[k] === b[k]);
+  }
+
+  // What to do with the address bar before rendering `targetHref`:
+  // 'skip' (nothing to write), 'replace' (same view, other spelling, or the
+  // first render at startup: no extra history entry) or 'push' (a new view).
+  // flags: { restoring } Back/Forward re-render, { loadMore }, { initial } first render.
+  function addressChange(currentSearch, targetHref, flags) {
+    const f = flags || {};
+    if (f.restoring || f.loadMore) return 'skip';
+    const cur = String(currentSearch || '').replace(/^\?/, '');
+    const target = String(targetHref || '');
+    const tq = target.indexOf('?') === -1 ? '' : target.slice(target.indexOf('?') + 1);
+    if (cur === tq) return 'skip';
+    if (sameRoute(parse(cur), parse(tq))) return 'replace';
+    return f.initial ? 'replace' : 'push';
+  }
+
+  return { addressChange, parse, home, channel, video, search, href, share, DEFAULT_REGION };
 })();
 
 // Export for Node.js (when running tests)
