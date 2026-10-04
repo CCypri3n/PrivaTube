@@ -87,7 +87,8 @@ test('channel() returns title, banner, thumbnail and subscriberCount as a number
     title: 'Chan One',
     banner: 'https://img.example/banner.jpg',
     thumbnail: 'https://img.example/chan1.jpg',
-    subscriberCount: 12345
+    subscriberCount: 12345,
+    uploadsPlaylistId: 'UUchan1'
   });
 });
 

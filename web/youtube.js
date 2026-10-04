@@ -235,12 +235,19 @@ const YouTube = (function () {
       return resource;
     }
 
-    // Channel info: { id, title, banner, thumbnail, subscriberCount }.
+    function uploadsPlaylistOf(resource) {
+      return (resource.contentDetails && resource.contentDetails.relatedPlaylists &&
+        resource.contentDetails.relatedPlaylists.uploads) || '';
+    }
+
+    // Channel info: { id, title, banner, thumbnail, subscriberCount, uploadsPlaylistId }.
     // banner is '' when the channel has none; subscriberCount is null when hidden.
+    // Pass uploadsPlaylistId to channelUploads to avoid a second channels request.
     async function channel(channelId) {
-      const r = await fetchChannelResource(channelId, 'snippet,statistics,brandingSettings');
+      const r = await fetchChannelResource(channelId, 'snippet,statistics,brandingSettings,contentDetails');
       const stats = r.statistics || {};
       return {
+        uploadsPlaylistId: uploadsPlaylistOf(r),
         id: r.id,
         title: (r.snippet && r.snippet.title) || '',
         banner: (r.brandingSettings && r.brandingSettings.image && r.brandingSettings.image.bannerExternalUrl) || '',
@@ -251,13 +258,13 @@ const YouTube = (function () {
 
     // A channel's uploads as a Listing of video items (newest first). An unknown
     // channel makes the first more() throw Failure 'not_found'.
-    function channelUploads(channelId, { includeShorts = false } = {}) {
-      let uploadsPlaylistId = null;
+    // A known `uploadsPlaylistId` (from channel()) skips the channels lookup.
+    function channelUploads(channelId, { includeShorts = false, uploadsPlaylistId: known = '' } = {}) {
+      let uploadsPlaylistId = known || null;
       return makeListing(async pageToken => {
         if (!uploadsPlaylistId) {
           const r = await fetchChannelResource(channelId, 'contentDetails');
-          uploadsPlaylistId = r.contentDetails && r.contentDetails.relatedPlaylists &&
-            r.contentDetails.relatedPlaylists.uploads;
+          uploadsPlaylistId = uploadsPlaylistOf(r);
           if (!uploadsPlaylistId) throw new Failure('not_found', 'Channel has no uploads playlist');
         }
         const data = await call('playlistItems', {

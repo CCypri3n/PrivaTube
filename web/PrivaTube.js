@@ -167,10 +167,12 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   const yt = getYouTube();
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading channel videos...</p>";
-    listing = yt.channelUploads(channelId);
-    // Banner and name; a failure here only hides the banner (the listing reports its own).
+    listing = null;
+    // One channels request: info (banner, name) and the uploads playlist id.
+    // Its failure reason (not found, quota, key, offline) decides what is shown.
     try {
       const channel = await yt.channel(channelId);
+      listing = yt.channelUploads(channelId, { uploadsPlaylistId: channel.uploadsPlaylistId });
       document.title = `PrivaTube - Checking out "${channel.title}"`;
       bannerDiv.style.display = 'block';
       bannerDiv.innerHTML = `
@@ -179,8 +181,14 @@ async function fetchChannelVideos(channelId, loadMore = false) {
           <div class="channel-banner-title">${channel.title}</div>
           </div>
       `;
-    } catch (e) {
+    } catch (error) {
       bannerDiv.style.display = 'none';
+      resultsDiv.innerHTML = `<p>${error && error.reason === 'not_found'
+        ? 'Channel not found.'
+        : messageForFailure(error, "Could not load channel videos.")}</p>`;
+      toggleLoadMoreButton(false);
+      console.error(error);
+      return;
     }
   }
 
