@@ -12,7 +12,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 **Player page**: `video.html` + `web/VideoPlayer.js`. Reads `?v=<videoId>` (and optional `&t=<seconds>`), embeds the video via `youtube-nocookie.com`, and shows stats, description and comments.
 
-**Shorts filter**: Videos of 60 seconds or less, or tagged `#shorts`, are dropped from listings.
+**Shorts filter**: Videos of 180 seconds or less, or tagged `#shorts`, are dropped from listings, as are livestreams/upcoming videos (duration `P0D`). Lives in `web/shorts.js` (pure, unit-tested); trending, search and channel listings share it and refill pages until ~24 items remain.
 
 **Comment sort**: `relevance` ("Top comments", default) or `time` ("Newest first"), passed to the `commentThreads` endpoint.
 
@@ -22,6 +22,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 - `index.html`, `video.html`: the two pages
 - `web/PrivaTube.js`, `web/VideoPlayer.js`: logic for each page (API-key handling is duplicated in both)
+- `web/shorts.js`: duration parser and Shorts predicate (also loaded by `tests/`)
 - `web/styles.css`, `web/icons/`: shared styling and icons
 
-No build step, package manager or tests. To run, open `index.html` or serve the folder statically.
+No build step or package manager. Pure logic is tested with `node --test tests/*.test.js`. To run, open `index.html` or serve the folder statically.

@@ -7,14 +7,6 @@ let lastRegionCode = 'FR'; // for trending/homepage
 
 let API_KEY = '';
 
-// Helper to parse ISO 8601 duration (e.g., PT45S, PT1M2S)
-function parseDuration(isoDuration) {
-  const match = isoDuration.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
-  const minutes = parseInt(match && match[1] ? match[1] : '0', 10);
-  const seconds = parseInt(match && match[2] ? match[2] : '0', 10);
-  return minutes * 60 + seconds;
-}
-
 function parseDurationToVisual(duration) {
     // Regular expression to parse the duration
     const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -36,8 +28,8 @@ function parseDurationToVisual(duration) {
     }
 }
 
-// Filter shorts from a list of video items using duration and #shorts in title/description
-// Filter shorts from a list of video items using duration and #shorts in title/description
+// Keep only listable videos (see isListable in shorts.js). Videos absent from the
+// `videos` response (private/deleted) are dropped silently.
 async function filterOutShorts(videoItems) {
   if (!videoItems.length) return [];
   const ids = videoItems.map(item => item.id.videoId || item.id).join(',');
@@ -45,20 +37,30 @@ async function filterOutShorts(videoItems) {
     `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${ids}&key=${API_KEY}`
   );
   const data = await response.json();
-  const allowedIds = data.items
-    .filter(v => {
-      // Filter by duration
-      const isLong = parseDuration(v.contentDetails.duration) > 60;
-      // Filter by #shorts in title or description
-      const title = v.snippet.title || '';
-      const desc = v.snippet.description || '';
-      const hasShortsTag = /#shorts/i.test(title) || /#shorts/i.test(desc);
-      return isLong && !hasShortsTag;
-    })
-    .map(v => v.id);
+  const allowedIds = new Set((data.items || [])
+    .filter(v => isListable({
+      duration: v.contentDetails.duration,
+      title: v.snippet.title,
+      description: v.snippet.description
+    }))
+    .map(v => v.id));
+  return videoItems.filter(item => allowedIds.has(item.id.videoId || item.id));
+}
 
-  // Return only videos that pass both filters
-  return videoItems.filter(item => allowedIds.includes(item.id.videoId || item.id));
+// Fetch pages until ~PAGE_SIZE items survive filtering or no pages remain.
+// fetchPage(token) -> { items (already filtered), nextPageToken }.
+const PAGE_SIZE = 24;
+const MAX_REFILL_PAGES = 5;
+async function collectPages(fetchPage, startToken) {
+  let items = [];
+  let token = startToken;
+  for (let i = 0; i < MAX_REFILL_PAGES; i++) {
+    const page = await fetchPage(token);
+    items = items.concat(page.items);
+    token = page.nextPageToken || null;
+    if (!token || items.length >= PAGE_SIZE) break;
+  }
+  return { items, nextPageToken: token };
 }
 
 // --- API Key Modal Logic ---
@@ -135,17 +137,23 @@ async function showHomepage(loadMore = false) {
     nextPageToken = null;
   }
   try {
-    let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=${lastRegionCode}&maxResults=24&key=${API_KEY}`;
-    if (nextPageToken) url += `&pageToken=${nextPageToken}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    nextPageToken = data.nextPageToken || null;
-    // Filter out Shorts directly (contentDetails is already present)
-    const items = data.items.filter(item => parseDuration(item.contentDetails.duration) > 60)
-      .map(item => ({
-        id: { kind: "youtube#video", videoId: item.id },
-        snippet: item.snippet
-      }));
+    const result = await collectPages(async token => {
+      let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=${lastRegionCode}&maxResults=${PAGE_SIZE}&key=${API_KEY}`;
+      if (token) url += `&pageToken=${token}`;
+      const data = await (await fetch(url)).json();
+      return {
+        nextPageToken: data.nextPageToken,
+        items: data.items
+          .filter(item => isListable({
+            duration: item.contentDetails.duration,
+            title: item.snippet.title,
+            description: item.snippet.description
+          }))
+          .map(item => ({ id: { kind: "youtube#video", videoId: item.id }, snippet: item.snippet }))
+      };
+    }, nextPageToken);
+    nextPageToken = result.nextPageToken;
+    const items = result.items;
     if (loadMore) {
       displayResults(true, items);
     } else {
@@ -185,28 +193,27 @@ async function searchVideos(loadMore = false) {
     nextPageToken = null;
   }
   try {
-    let url = `${BASE_URL}?part=snippet&q=${query}&type=video,channel&key=${API_KEY}&maxResults=24`;
-    if (nextPageToken) url += `&pageToken=${nextPageToken}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    nextPageToken = data.nextPageToken || null;
-    // Separate videos and channels
-    const videoItems = data.items.filter(item => item.id.kind === "youtube#video");
-    const channelItems = data.items.filter(item => item.id.kind === "youtube#channel");
-    const channelIds = channelItems.map(item => item.id.channelId).join(',');
     let channelStats = {};
-    if (channelIds) {
-      const statsResp = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelIds}&key=${API_KEY}`
-      );
-      const statsData = await statsResp.json();
-      statsData.items.forEach(ch => {
-        channelStats[ch.id] = ch.statistics.subscriberCount;
-      });
-    }
-    // Filter out Shorts from videos
-    const filteredVideos = await filterOutShorts(videoItems);
-    const finalItems = [...filteredVideos, ...channelItems];
+    const result = await collectPages(async token => {
+      let url = `${BASE_URL}?part=snippet&q=${query}&type=video,channel&key=${API_KEY}&maxResults=${PAGE_SIZE}`;
+      if (token) url += `&pageToken=${token}`;
+      const data = await (await fetch(url)).json();
+      const videoItems = data.items.filter(item => item.id.kind === "youtube#video");
+      const channelItems = data.items.filter(item => item.id.kind === "youtube#channel");
+      const channelIds = channelItems.map(item => item.id.channelId).join(',');
+      if (channelIds) {
+        const statsData = await (await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelIds}&key=${API_KEY}`
+        )).json();
+        statsData.items.forEach(ch => {
+          channelStats[ch.id] = ch.statistics.subscriberCount;
+        });
+      }
+      const filteredVideos = await filterOutShorts(videoItems);
+      return { nextPageToken: data.nextPageToken, items: [...filteredVideos, ...channelItems] };
+    }, nextPageToken);
+    nextPageToken = result.nextPageToken;
+    const finalItems = result.items;
     if (loadMore) {
       displayResults(true, finalItems, channelStats);
     } else {
@@ -283,31 +290,20 @@ async function fetchChannelVideos(channelId, loadMore = false) {
       fetchChannelVideos.lastChannelId = channelId;
     }
 
-    let filteredVideos = [];
-    let attempts = 0;
-    let localPageToken = nextPageToken;
-    // Try up to 5 pages to collect enough non-Shorts
-    while (filteredVideos.length < 24 && attempts < 5) {
-      let url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=24&key=${API_KEY}`;
-      if (localPageToken) url += `&pageToken=${localPageToken}`;
-      const playlistResp = await fetch(url);
-      const playlistData = await playlistResp.json();
-      localPageToken = playlistData.nextPageToken || null;
+    const result = await collectPages(async token => {
+      let url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${PAGE_SIZE}&key=${API_KEY}`;
+      if (token) url += `&pageToken=${token}`;
+      const playlistData = await (await fetch(url)).json();
       const videoItems = playlistData.items.map(item => ({
         id: { kind: "youtube#video", videoId: item.snippet.resourceId.videoId },
         snippet: item.snippet
       }));
-      const nonShorts = await filterOutShorts(videoItems);
-      filteredVideos = filteredVideos.concat(nonShorts);
-      // If there are no more pages, break early
-      if (!localPageToken) break;
-      attempts++;
-    }
-    // Set the global nextPageToken for "Load More"
-    nextPageToken = localPageToken;
+      return { nextPageToken: playlistData.nextPageToken, items: await filterOutShorts(videoItems) };
+    }, nextPageToken);
+    const filteredVideos = result.items;
+    nextPageToken = result.nextPageToken;
 
-    // Only show up to 24 videos per page
-    const videosToShow = filteredVideos.slice(0, 24);
+    const videosToShow = filteredVideos; // not sliced: the page token has already advanced past these
 
 if (loadMore) {
       displayResults(true, videosToShow);
