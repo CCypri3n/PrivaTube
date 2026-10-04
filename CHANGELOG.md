@@ -2,6 +2,11 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-04 — YouTube module step 2: channels
+- `web/youtube.js`: added `channel(id)` (title, banner, thumbnail, subscriberCount) and `channelUploads(id, { includeShorts })` returning a Listing (same Shorts/livestream/unavailable filtering, refill, no duplicates, `more()`); an unknown channel throws `YouTube.Failure` with reason `not_found`.
+- `web/PrivaTube.js`: channel mode only calls the module and renders (banner, "Channel not found."); deleted the inline channel fetching, cached uploads-playlist state, `collectPages`, `filterListable`, `isListableResource`, the legacy result rendering, `parseDurationToVisual`, `PAGE_SIZE` and the `nextPageToken` global.
+- Added `tests/youtube-channels.test.js`; `CONTEXT.md` updated (merged duplicate Listing/YouTube module entries). Step 2 of #10, closes #12.
+
 ## 2026-10-04 — YouTube module step 1: core, trending and search
 - New `web/youtube.js` (`YouTube.create({ apiKey, fetchJson })`): trending and search return Listings with `more()`, normalized items (numbers, duration in seconds, stats joined), Shorts/livestream/unavailable filtering via `shorts.js` (`includeShorts` bypasses Shorts only), bounded page refill, de-duplication, and `YouTube.Failure` with a reason (invalid key, quota exceeded, offline, not found, other).
 - `web/PrivaTube.js`: home and search now only call the module and render; removed their inline fetching, the stats re-fetch and the shared `nextPageToken` for these paths. Quota/invalid-key/offline show distinct messages. Channel mode unchanged (legacy rendering kept until step 2).

@@ -1,5 +1,3 @@
-// Shared position for channel mode only (moves to a Listing in step 2).
-let nextPageToken = null;
 // Listing for the current home/search mode; "Load More" calls listing.more().
 let listing = null;
 let currentMode = 'home'; // 'home', 'search', or 'channel'
@@ -31,68 +29,6 @@ function formatSeconds(total) {
   const ss = sec.toString().padStart(2, '0');
   return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
-
-function parseDurationToVisual(duration) {
-    // Regular expression to parse the duration
-    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-
-    if (!match) {
-        return "Invalid duration format";
-    }
-
-    // Extract hours, minutes, and seconds
-    const hours = parseInt(match[1]) || 0;
-    const minutes = parseInt(match[2]) || 0;
-    const seconds = parseInt(match[3]) || 0;
-
-    // Format to hh:mm:ss or mm:ss based on whether hours are present
-    if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    } else {
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-}
-
-// Adapts a YouTube `videos` resource (with contentDetails + snippet) to the predicate.
-function isListableResource(v) {
-  return isListable({
-    duration: v.contentDetails.duration,
-    title: v.snippet.title,
-    description: v.snippet.description
-  });
-}
-
-// Keep only listable videos (see isListable in shorts.js). Videos absent from the
-// `videos` response (private/deleted) are dropped silently.
-async function filterListable(videoItems) {
-  if (!videoItems.length) return [];
-  const ids = videoItems.map(item => item.id.videoId || item.id).join(',');
-  const response = await fetch(
-    `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${ids}&key=${API_KEY}`
-  );
-  const data = await response.json();
-  const allowedIds = new Set((data.items || [])
-    .filter(isListableResource)
-    .map(v => v.id));
-  return videoItems.filter(item => allowedIds.has(item.id.videoId || item.id));
-}
-
-// Fetch pages until ~PAGE_SIZE items survive filtering or no pages remain.
-// fetchPage(token) -> { items (already filtered), nextPageToken }.
-const PAGE_SIZE = 24;
-const MAX_REFILL_PAGES = 5;
-async function collectPages(fetchPage, startToken, isCounted = () => true) {
-  let items = [];
-  let token = startToken;
-  for (let i = 0; i < MAX_REFILL_PAGES; i++) {
-    const page = await fetchPage(token);
-    items = items.concat(page.items);
-    token = page.nextPageToken || null;
-    if (!token || items.filter(isCounted).length >= PAGE_SIZE) break;
-  }
-  return { items, nextPageToken: token };
-}
-
 // --- API Key Modal Logic ---
 function fetchApiKey() {
   const storedKey = localStorage.getItem('api_key');
@@ -218,7 +154,6 @@ async function searchVideos(loadMore = false) {
 }
 
 // --- Fetch Channel Videos ---
-
 async function fetchChannelVideos(channelId, loadMore = false) {
   window.scrollTo(0, 0);
   currentMode = 'channel';
@@ -229,86 +164,38 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   window.history.pushState({}, '', url);
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
-  if (!loadMore) {
+  const yt = getYouTube();
+  if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading channel videos...</p>";
-    listing = null;
-    nextPageToken = null;
-    fetchChannelVideos.uploadsPlaylistId = null;
-    fetchChannelVideos.lastChannelId = null;
-    // Fetch and display channel banner and name
+    listing = yt.channelUploads(channelId);
+    // Banner and name; a failure here only hides the banner (the listing reports its own).
     try {
-      const channelInfoResp = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=snippet,brandingSettings&id=${channelId}&key=${API_KEY}`
-      );
-      const channelInfoData = await channelInfoResp.json();
-      if (channelInfoData.items && channelInfoData.items.length > 0) {
-        const channel = channelInfoData.items[0];
-        const bannerUrl = channel.brandingSettings?.image?.bannerExternalUrl;
-        const channelName = channel.snippet?.title || '';
-        document.title = `PrivaTube - Checking out "${channel.snippet.title}"`;
-        bannerDiv.style.display = 'block';
-        bannerDiv.innerHTML = `
-            <div class="channel-banner-inner">
-            ${bannerUrl ? `<img class="channel-banner-img" src="${bannerUrl}" alt="">` : ''}
-            <div class="channel-banner-title">${channelName}</div>
-            </div>
-        `;
-        } else {
-        bannerDiv.style.display = 'none';
-        }
-
+      const channel = await yt.channel(channelId);
+      document.title = `PrivaTube - Checking out "${channel.title}"`;
+      bannerDiv.style.display = 'block';
+      bannerDiv.innerHTML = `
+          <div class="channel-banner-inner">
+          ${channel.banner ? `<img class="channel-banner-img" src="${channel.banner}" alt="">` : ''}
+          <div class="channel-banner-title">${channel.title}</div>
+          </div>
+      `;
     } catch (e) {
       bannerDiv.style.display = 'none';
     }
   }
 
   try {
-    // Get uploads playlist ID (only on first load or if channel changed)
-    let uploadsPlaylistId = fetchChannelVideos.uploadsPlaylistId;
-    if (!uploadsPlaylistId || lastChannelId !== fetchChannelVideos.lastChannelId) {
-      const channelResp = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}&key=${API_KEY}`
-      );
-      const channelData = await channelResp.json();
-      if (!channelData.items || !channelData.items.length) {
-        resultsDiv.innerHTML = '<p>Channel not found.</p>';
-        toggleLoadMoreButton(false);
-        return;
-      }
-      uploadsPlaylistId = channelData.items[0].contentDetails.relatedPlaylists.uploads;
-      fetchChannelVideos.uploadsPlaylistId = uploadsPlaylistId;
-      fetchChannelVideos.lastChannelId = channelId;
-    }
-
-    const result = await collectPages(async token => {
-      let url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${PAGE_SIZE}&key=${API_KEY}`;
-      if (token) url += `&pageToken=${token}`;
-      const playlistData = await (await fetch(url)).json();
-      const videoItems = playlistData.items.map(item => ({
-        id: { kind: "youtube#video", videoId: item.snippet.resourceId.videoId },
-        snippet: item.snippet
-      }));
-      return { nextPageToken: playlistData.nextPageToken, items: await filterListable(videoItems) };
-    }, nextPageToken);
-    const filteredVideos = result.items;
-    nextPageToken = result.nextPageToken;
-
-    
-if (loadMore) {
-      displayLegacyResults(true, filteredVideos);
-    } else {
-      displayLegacyResults(false, filteredVideos);
-    }
-    toggleLoadMoreButton(!!nextPageToken);
-  } catch (err) {
-    resultsDiv.innerHTML = '<p>Could not load channel videos.</p>';
+    const { items, hasMore } = await listing.more();
+    displayItems(loadMore, items);
+    toggleLoadMoreButton(hasMore);
+  } catch (error) {
+    resultsDiv.innerHTML = `<p>${error && error.reason === 'not_found'
+      ? 'Channel not found.'
+      : messageForFailure(error, "Could not load channel videos.")}</p>`;
     toggleLoadMoreButton(false);
-    console.error(err);
+    console.error(error);
   }
 }
-
-
-
 
 // --- Results Rendering Helpers ---
 // Renders YouTube module items (video / channel). Stats are already joined.
@@ -367,87 +254,6 @@ function renderItem(item) {
   }
   return '';
 }
-
-// Legacy rendering for channel mode (raw YouTube items + stats re-fetch).
-// TODO(step 2 of #10): delete once channels use the YouTube module.
-async function displayLegacyResults(append, items, channelStats = {}) {
-  const resultsDiv = document.getElementById('results');
-  if (!items || items.length === 0) {
-    resultsDiv.innerHTML = "<p>No results found.</p>";
-    toggleLoadMoreButton(false);
-    return;
-  }
-  const videoItems = items.filter(item => item.id.kind === "youtube#video");
-  const videoIds = videoItems.map(item => item.id.videoId).join(',');
-  let videoStats = {};
-  if (videoIds) {
-    const statsResp = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}&key=${API_KEY}`
-    );
-    const statsData = await statsResp.json();
-    statsData.items.forEach(v => {
-      videoStats[v.id] = v;
-    });
-  }
-  if (append) {
-    resultsDiv.innerHTML += items.map(item => renderLegacyResultItem(item, channelStats, videoStats)).join('');
-  }
-  else {
-    resultsDiv.innerHTML = items.map(item => renderLegacyResultItem(item, channelStats, videoStats)).join('');
-  }
-}
-
-function renderLegacyResultItem(item, channelStats = {}, videoStats = {}) {
-  if (item.id.kind === "youtube#video") {
-    const stats = videoStats[item.id.videoId];
-    // Format date as "YYYY-MM-DD" or any other style you prefer
-    const dateStr = item.snippet.publishedAt
-      ? new Date(item.snippet.publishedAt).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
-      : '';
-    const videoUrl = createVideoUrl(item.id.videoId);
-    const channelUrl = createChannelUrl(item.snippet.channelId);
-    const duration = stats && stats.contentDetails ? parseDurationToVisual(stats.contentDetails.duration) : 'N/A';
-    return `
-        <div class="video-item">
-            <a href="${videoUrl}" target="_self">
-              <div class="video-thumb-container">
-                <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
-                <span class="video-duration">${duration}</span>
-              </div>
-            </a>
-            <h3>${item.snippet.title}</h3>
-            <div class="video-meta">
-            <span class="video-date">${dateStr}</span>
-            <span class="video-meta-sep">&nbsp;•&nbsp;</span>
-            <a href="${channelUrl}" class="channel-link" target="_self">
-                ${item.snippet.channelTitle}
-            </a>
-            <span class="video-meta-sep">&nbsp;•&nbsp;</span>
-            <span class="video-views-render">
-                ${stats && stats.statistics.viewCount ? Number(stats.statistics.viewCount).toLocaleString() : 'N/A'} views
-            </span>
-            </div>
-        </div>
-        `
-  } else if (item.id.kind === "youtube#channel") {
-    const subs = channelStats[item.id.channelId];
-    const channelUrl = createChannelUrl(item.id.channelId);
-    return `
-    <a href="${channelUrl}" target="_self">
-      <div class="channel-item" data-channel-id="${item.id.channelId}" onclick="fetchChannelVideos('${item.id.channelId}')">
-        <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}" />
-        <h3>${item.snippet.title}</h3>
-        <p class="attention">Click to view channel videos</p>
-        <p class="subs">${subs ? `${Number(subs).toLocaleString()} subscribers` : ''}</p>
-      </div>
-    </a>
-    `;
-  } else {
-    return '';
-  }
-}
-
-
 
 // --- Show/hide Load More button ---
 function toggleLoadMoreButton(show) {

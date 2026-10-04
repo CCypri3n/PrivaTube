@@ -1,6 +1,6 @@
 /**
  * YouTube module: the single place that talks to the YouTube Data API v3 for
- * trending and search listings (channels and the player page follow in later steps).
+ * trending, search and channel listings (the player page follows in a later step).
  *
  * Plain script, no imports. Exposes one global, `YouTube`. No DOM, no localStorage.
  *
@@ -225,7 +225,62 @@ const YouTube = (function () {
       }, countVideos);
     }
 
-    return { trending, search };
+    // --- Channels (step 2 of #10) ---
+
+    // Looks up one channel; unknown id -> Failure 'not_found'.
+    async function fetchChannelResource(channelId, part) {
+      const data = await call('channels', { part, id: channelId });
+      const resource = (data.items || [])[0];
+      if (!resource) throw new Failure('not_found', 'Channel not found');
+      return resource;
+    }
+
+    // Channel info: { id, title, banner, thumbnail, subscriberCount }.
+    // banner is '' when the channel has none; subscriberCount is null when hidden.
+    async function channel(channelId) {
+      const r = await fetchChannelResource(channelId, 'snippet,statistics,brandingSettings');
+      const stats = r.statistics || {};
+      return {
+        id: r.id,
+        title: (r.snippet && r.snippet.title) || '',
+        banner: (r.brandingSettings && r.brandingSettings.image && r.brandingSettings.image.bannerExternalUrl) || '',
+        thumbnail: thumbnailOf(r.snippet),
+        subscriberCount: stats.hiddenSubscriberCount ? null : toNumber(stats.subscriberCount)
+      };
+    }
+
+    // A channel's uploads as a Listing of video items (newest first). An unknown
+    // channel makes the first more() throw Failure 'not_found'.
+    function channelUploads(channelId, { includeShorts = false } = {}) {
+      let uploadsPlaylistId = null;
+      return makeListing(async pageToken => {
+        if (!uploadsPlaylistId) {
+          const r = await fetchChannelResource(channelId, 'contentDetails');
+          uploadsPlaylistId = r.contentDetails && r.contentDetails.relatedPlaylists &&
+            r.contentDetails.relatedPlaylists.uploads;
+          if (!uploadsPlaylistId) throw new Failure('not_found', 'Channel has no uploads playlist');
+        }
+        const data = await call('playlistItems', {
+          part: 'snippet',
+          playlistId: uploadsPlaylistId,
+          maxResults: PAGE_SIZE,
+          pageToken
+        });
+        const ids = (data.items || [])
+          .map(i => i.snippet && i.snippet.resourceId && i.snippet.resourceId.videoId)
+          .filter(Boolean);
+        const byId = {};
+        if (ids.length) {
+          const v = await call('videos', { part: 'snippet,statistics,contentDetails', id: ids.join(',') });
+          (v.items || []).forEach(r => { byId[r.id] = r; });
+        }
+        // Absent from the `videos` answer = private/deleted: dropped silently.
+        const items = ids.map(id => byId[id]).filter(r => r && isShown(r, includeShorts)).map(videoItem);
+        return { nextPageToken: data.nextPageToken, items };
+      }, countVideos);
+    }
+
+    return { trending, search, channel, channelUploads };
   }
 
   return { create, Failure };
