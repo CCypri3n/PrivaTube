@@ -137,14 +137,14 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
   // Update the button display
   if (btn) {
-    btn.innerHTML = `${lastRegionCode} ▼`;
+    btn.textContent = `${lastRegionCode} ▼`;
   }
 
   // Handle country selection
   list.querySelectorAll('div').forEach(item => {
   item.addEventListener('click', (e) => {
     const code = item.getAttribute('data-code');
-    btn.innerHTML = `${code} ▼`;
+    btn.textContent = `${code} ▼`;
     list.style.display = 'none';
     btn.classList.remove('active');
     lastRegionCode = code;
@@ -216,34 +216,6 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
 });
 
-function linkify(text) {
-  // Create a temporary DOM element
-  const div = document.createElement('div');
-  div.innerHTML = text;
-
-  function walk(node) {
-    if (node.nodeType === 3) { // Text node
-      // Replace URLs in text nodes only
-      const replaced = node.nodeValue.replace(
-        /(https?:\/\/[^\s]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-      ).replace(
-        /\b([a-zA-Z0-9_-]+\.html(?:\?[^\s]*)?)/g,
-        '<a href="$1">$1</a>'
-      );
-      if (replaced !== node.nodeValue) {
-        const span = document.createElement('span');
-        span.innerHTML = replaced;
-        node.parentNode.replaceChild(span, node);
-      }
-    } else if (node.nodeType === 1 && node.tagName !== 'A') {
-      Array.from(node.childNodes).forEach(walk);
-    }
-  }
-  walk(div);
-  return div.innerHTML;
-}
-
 // --- Video Player Logic ---
 
 // Show video info based on videoId (Description, Title, Channel Info)
@@ -254,10 +226,9 @@ async function videoInfoShow(videoId) {
       video = await youtube().video(videoId);
       clearLoadError({ restoreDetails: true });
       document.getElementById('video-title').textContent = video.title;
-      document.getElementById('video-description').innerHTML = youtubeDescriptiontoPrivaTube(video.description);
+      document.getElementById('video-description').innerHTML = Safe.description(video.description, { videoId, region: Route.parse(window.location.search).region });
       document.getElementById('view-count').innerHTML = video.viewCount
-          ? `<img src="web/icons/views-96.svg" alt="Views" class="description-view-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${video.viewCount
-            .toLocaleString('de-DE')}`
+          ? `<img src="web/icons/views-96.svg" alt="Views" class="description-view-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${Safe.escape(video.viewCount.toLocaleString('de-DE'))}`
           : '';
       const publishedDate = new Date(video.publishedAt);
       document.getElementById('video-published-date').textContent =
@@ -280,9 +251,9 @@ async function videoInfoShow(videoId) {
       document.getElementById('channel-name').style.cursor = "pointer";
       const likeCount = video.likeCount ? video.likeCount.toLocaleString() : '';
       document.getElementById('channel-likes').innerHTML = likeCount
-        ? `<img src="web/icons/like-96.svg" alt="Likes" class="channel-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${likeCount}`
+        ? `<img src="web/icons/like-96.svg" alt="Likes" class="channel-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-left:8px;margin-right:4px;">${Safe.escape(likeCount)}`
         : '';
-      document.getElementById('channel-avatar').src = channel.avatar;
+      document.getElementById('channel-avatar').src = Safe.url(channel.avatar, '');
       document.getElementById('channel-avatar').alt = channel.title;
       document.getElementById('channel-avatar').style.cursor = "pointer";
       document.getElementById('channel-link').href = Route.channel(channel.id, Route.parse(window.location.search));
@@ -328,7 +299,7 @@ async function playVideo(videoId) {
   const route = Route.parse(window.location.search);
   // Update the URL without reloading
   window.history.replaceState({}, '', Route.video(videoId, route));
-  let videoUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  let videoUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}`;
   if (route.t !== null) {
     videoUrl += `?start=${route.t}`;
   }
@@ -336,14 +307,15 @@ async function playVideo(videoId) {
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
   const videoInfoDiv = document.getElementById('video-info');
-  playerDiv.innerHTML = `<iframe
-      class="video-embed"
-      src="${videoUrl}"
-      title="PrivaTube Video Player"
-      allow="web-share"
-      referrerpolicy="strict-origin-when-cross-origin"
-      allowfullscreen>
-    </iframe>`;
+  // Built with DOM calls: videoId comes from the address bar, so it must never be parsed as HTML.
+  const iframe = document.createElement('iframe');
+  iframe.className = 'video-embed';
+  iframe.src = videoUrl;
+  iframe.title = 'PrivaTube Video Player';
+  iframe.setAttribute('allow', 'web-share');
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  iframe.allowFullscreen = true;
+  playerDiv.replaceChildren(iframe);
   playerDiv.style.display = 'block';
   if (resultsDiv) resultsDiv.style.display = 'none';
   if (bannerDiv) bannerDiv.style.display = 'none';
@@ -364,81 +336,6 @@ function closePlayer() {
   if (bannerDiv) bannerDiv.style.display = '';
   if (videoInfoDiv) videoInfoDiv.style.display = 'none'; // <-- Hide info
   videoInfoShow(false);
-}
-
-function youtubeDescriptiontoPrivaTube(description) {
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-  if (!description) return '';
-  // Remove excessive whitespace
-  description = description.replace(/\s+/g, ' ').trim();
-    // Regex to match YouTube video URLs (both with and without "www.")
-  const ytUrlRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/g;
-
-  // Replace each YouTube video URL with your custom format
-  description = description.replace(ytUrlRegex, (match, videoId) => {
-    return `video.html?v=${videoId}`;
-  });
-
-  // If you want to also match youtu.be short links:
-  const ytShortUrlRegex = /https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})/g;
-  description = description.replace(ytShortUrlRegex, (match, videoId) => {
-    return `video.html?v=${videoId}`;
-  });
-
-  // Replace YouTube channel URLs with channel ID (not handle)
-  // Channel IDs are 24 characters, start with UC, and contain letters, numbers, -, _
-  description = description.replace(
-    /https?:\/\/(?:www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/g,
-    'index.html?ch=$1'
-  );
-
-  // Match Timecodes in the format "00:00" or "0:00" or "00:0"
-  const timecodeRegex = /(\d{1,2}:\d{2}(?::\d{2})?)/g;
-  description = description.replace(timecodeRegex, (match) => {
-    // Convert to seconds
-    const parts = match.split(':').map(Number);
-    let seconds = 0;
-    if (parts.length === 3) {
-      seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-    } else if (parts.length === 2) {
-      seconds = parts[0] * 60 + parts[1];
-    } else {
-      seconds = parts[0]; // Just in case
-    }
-    return `<a href="${Route.video(lastPlayedVideoId, { region: Route.parse(window.location.search).region, t: seconds })}">${match}</a>`;
-  });
-
-  return linkify(description);
-}
-
-function youtubeCommentPrivaTube(comment) {
-  if (!comment) return '';
-
-  // Remove excessive whitespace
-  comment = comment.replace(/\s+/g, ' ').trim();
-
-  // 1. Replace YouTube video URLs (with optional &t= and other params)
-  // Example: https://www.youtube.com/watch?v=abcdefghijk&t=123s&ab_channel=Test
-  const ytUrlRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})(&[^\s]*)?/g;
-  comment = comment.replace(ytUrlRegex, (match, videoId, params) => {
-    return `video.html?v=${videoId}${params ? params : ''}`;
-  });
-
-  // 2. Replace youtu.be short links (with optional ?t= and other params)
-  // Example: https://youtu.be/abcdefghijk?t=123
-  const ytShortUrlRegex = /https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(\?[^\s]*)?/g;
-  comment = comment.replace(ytShortUrlRegex, (match, videoId, params) => {
-    return `video.html?v=${videoId}${params ? params : ''}`;
-  });
-
-  // 3. Replace YouTube channel URLs with channel ID (not handle)
-  // Example: https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx
-  comment = comment.replace(
-    /https?:\/\/(?:www\.)?youtube\.com\/channel\/(UC[a-zA-Z0-9_-]{22})/g,
-    'index.html?ch=$1'
-  );
-
-  return comment;
 }
 
 // (Re)starts the comment list for a video with the current sort order.
@@ -493,27 +390,27 @@ async function loadMoreComments(first = false) {
       console.warn("Comment text is empty, skipping:", comment);
       return; // Skip empty comments
     }
-    const text = youtubeCommentPrivaTube(rawText);
+    const text = Safe.comment(rawText, { region: Route.parse(window.location.search).region });
     const likeCount = comment.likeCount ? comment.likeCount.toLocaleString() : '';
     commentDiv.className = 'comment';
     commentDiv.innerHTML = `
-      <a href="${channelUrl}" class="comment-avatar-link">
-        <img src="${comment.authorAvatar}" alt=" " class="comment-avatar"
+      <a href="${Safe.escape(channelUrl)}" class="comment-avatar-link">
+        <img src="${Safe.urlAttr(comment.authorAvatar, 'web/icons/unavailableAvatar-96.svg')}" alt=" " class="comment-avatar"
           onerror="this.onerror=null;this.src='web/icons/unavailableAvatar-96.svg';">
       </a>
       <div class="comment-main">
         <div class="comment-header">
-        ${comment.authorChannelId ? `<a href="${channelUrl}" class="comment-author-link"><label class="comment-author">${comment.authorName}</label></a>` : `<strong class="comment-author">${comment.authorName}</strong>`}
-          <span class="comment-date">${
+        ${comment.authorChannelId ? `<a href="${Safe.escape(channelUrl)}" class="comment-author-link"><label class="comment-author">${Safe.escape(comment.authorName)}</label></a>` : `<strong class="comment-author">${Safe.escape(comment.authorName)}</strong>`}
+          <span class="comment-date">${Safe.escape(
           new Date(comment.publishedAt).toLocaleString(undefined, {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
           })
-        }</span>
+        )}</span>
         </div>
         <div class="comment-text">${text}</div>
          <div class="comment-likes">
-            ${likeCount ? `<img src="web/icons/like-96.svg" alt="Likes" class="comment-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">${likeCount}` : ''}
+            ${likeCount ? `<img src="web/icons/like-96.svg" alt="Likes" class="comment-like-icon" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">${Safe.escape(likeCount)}` : ''}
           </div>
       </div>
     `;

@@ -22,6 +22,8 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 **Route module**: `web/route.js`, global `Route`, pure (no DOM). The only code that knows the URL format. `Route.parse(search or href)` gives `{ mode, region, videoId, channelId, query, t }` (mode precedence `v` over `q` over `ch`, else home; region defaults to `FR`; `query` is decoded text). Builders `home`, `channel`, `video` (optional `t`), `search`, `href(route)` and `share` return hrefs. Handlers call it instead of using `URLSearchParams`.
 
+**Safe text module**: `web/safetext.js`, global `Safe`, pure (no DOM). The only code that turns YouTube-supplied text (titles, channel names, descriptions, comments, image URLs) into HTML: `Safe.escape`, `Safe.url` / `Safe.urlAttr` (http(s) or PrivaTube page links only), `Safe.description(text, { videoId, region })` (escape, rewrite YouTube links and timecodes, linkify) and `Safe.comment(textDisplay)` (allow-list: `<br>` and URL-checked `<a href>`, everything else shown as text). Page scripts never put API text into `innerHTML` except through it.
+
 **Share link**: A URL pointing back at PrivaTube rather than YouTube (the Pages site, `?v=<id>`, plus `&t=` when the player has a timecode; built by `Route.share`). Links in descriptions and comments are rewritten the same way.
 
 ## Layout
@@ -30,6 +32,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 - `web/PrivaTube.js`, `web/VideoPlayer.js`: logic for each page
 - `web/apikey.js`: API key popup, check and storage behind `ApiKey.getKey()`; storage, fetch and UI are injectable (tested in `tests/apikey.test.js`)
 - `web/route.js`: the Route module (loaded by both pages before the page scripts; tested in `tests/route.test.js`)
+- `web/safetext.js`: the Safe text module (loaded by both pages before the page scripts; tested in `tests/safetext.test.js`)
 - `web/shorts.js`: duration parser and Shorts predicate (also loaded by `tests/`)
 - `web/youtube.js`: the YouTube module (loaded after `shorts.js`, before `PrivaTube.js`; unit-tested with a fake fetch)
 - `web/styles.css`, `web/icons/`: shared styling and icons
