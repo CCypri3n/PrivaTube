@@ -9,19 +9,6 @@ let commentSort = 'relevance'; // Default sort order for comments, time or relev
 
 let API_KEY = '';
 
-function youtube() {
-  return YouTube.create({ apiKey: API_KEY, fetchJson: url => fetch(url).then(r => r.json()) });
-}
-
-function messageForFailure(error, fallback) {
-  const reason = error && error.reason;
-  if (reason === 'quota_exceeded') return "YouTube's daily limit for your API key has been reached. Please try again tomorrow.";
-  if (reason === 'invalid_key') return "Your API key is invalid. Please check it and try again.";
-  if (reason === 'offline') return "You appear to be offline. Please check your connection and try again.";
-  if (reason === 'not_found') return "Not found.";
-  return fallback;
-}
-
 // Load-failure area: one message, with the video details hidden and emptied.
 const DETAIL_IDS = ['video-info', 'video-stats', 'comment-action-wrapper'];
 const DETAIL_TEXT_IDS = ['video-title', 'video-description', 'view-count', 'video-published-date',
@@ -39,7 +26,7 @@ function clearLoadError({ restoreDetails = false } = {}) {
 function showLoadError(error) {
   const message = (error && error.reason === 'not_found')
     ? 'Video not found.'
-    : messageForFailure(error, 'Could not load this video.');
+    : Shell.messageForFailure(error, 'Could not load this video.');
   DETAIL_IDS.forEach(id => { document.getElementById(id).style.display = 'none'; });
   DETAIL_TEXT_IDS.forEach(id => { document.getElementById(id).textContent = ''; });
   document.getElementById('video-description').innerHTML = '';
@@ -71,23 +58,18 @@ async function showHomepage() {
 }
 
 
-async function searchVideos(query) {
+async function searchVideos(text) {
     // Search happens on the browse page: go there with the query in the URL
     closePlayer();
-    const queryFromField = document.getElementById('searchQuery').value.trim();
-    window.location.href = Route.search(queryFromField, Route.parse(window.location.search));
+    window.location.href = Route.search(text, Route.parse(window.location.search));
 }
 
 
 document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed on page load
   const input = document.getElementById('searchQuery');
-  const btn = document.getElementById('country-code-btn');
-  const list = document.getElementById('country-list');
-  const mainHeader = document.getElementById('main-header-link');
   const copyBtn = document.getElementById('copy-share-link-btn');
   const startRoute = Route.parse(window.location.search);
   const videoId = startRoute.videoId;
-  const searchBtn = document.getElementById('search-btn');
   const shareBtn = document.getElementById('share-btn');
   const shareModal = document.getElementById('share-modal');
   const shareLink = document.getElementById('share-link');
@@ -101,22 +83,12 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
         input.value = ''; // Clear search input
     }
 
-  input.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-      searchVideos();
-    }
-  });
+  Shell.bindSearch({ onSearch: searchVideos });
 
   document.addEventListener('keydown', function(event) {
   if (event.key === "Escape" && shareModal && shareModal.style.display === 'flex') {
     shareModal.style.display = 'none';
   }
-  });
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    list.style.display = (list.style.display === 'block') ? 'none' : 'block';
-    btn.classList.toggle('active');
   });
 
   commentSortBtn.addEventListener('click', (e) => {
@@ -127,33 +99,22 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
   // Hide dropdown when clicking outside
   document.addEventListener('click', () => {
-    list.style.display = 'none';
-    btn.classList.remove('active');
     commentList.style.display = 'none';
     commentSortBtn.classList.remove('active');
   });
 
   lastRegionCode = startRoute.region;
-  mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
-  // Update the button display
-  if (btn) {
-    btn.textContent = `${lastRegionCode} ▼`;
-  }
+  Shell.showRegion(lastRegionCode); // button and header link carry the region
 
-  // Handle country selection
-  list.querySelectorAll('div').forEach(item => {
-  item.addEventListener('click', (e) => {
-    const code = item.getAttribute('data-code');
-    btn.textContent = `${code} ▼`;
-    list.style.display = 'none';
-    btn.classList.remove('active');
-    lastRegionCode = code;
-    const route = { ...Route.parse(window.location.search), region: lastRegionCode };
-    // Stay on the player page: rebuild the video href (a page without ?v= would parse as home).
-    if (route.videoId) window.history.replaceState({}, '', Route.video(route.videoId, route));
-    mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
-    });
- });
+  Shell.bindRegion({
+    onPick: code => {
+      Shell.showRegion(code);
+      lastRegionCode = code;
+      const route = { ...Route.parse(window.location.search), region: lastRegionCode };
+      // Stay on the player page: rebuild the video href (a page without ?v= would parse as home).
+      if (route.videoId) window.history.replaceState({}, '', Route.video(route.videoId, route));
+    }
+  });
   // Handle sort selection
   commentList.querySelectorAll('div').forEach(item => {
     item.addEventListener('click', (e) => {
@@ -181,26 +142,12 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     }
   });
 
-  ApiKey.getKey().then(key => {
-  if (key && videoId) {
+  Shell.start(key => {
     API_KEY = key;
-    playVideo(videoId)
-  } else {
-    closePlayer();
-    }
-  // If key is missing/invalid, ApiKey.getKey() keeps showing the popup until a key is accepted
-  }).catch(err => {
-    // Optional: log error, but don't show homepage
-    console.error("API Key error:", err);
+    if (videoId) playVideo(videoId);
+    else closePlayer();
   });
 
-  if (searchBtn) {
-    searchBtn.addEventListener('click', function() {
-      searchVideos();
-    });
-  }
-
-  
   if (shareBtn && shareModal && shareLink && shareCloseBtn) {
     shareBtn.onclick = function() {
       if (!lastPlayedVideoId) return;
@@ -235,7 +182,7 @@ async function videoInfoShow(videoId) {
   if (videoId) {
     let video = null;
     try {
-      video = await youtube().video(videoId);
+      video = await Shell.youtube(API_KEY).video(videoId);
       clearLoadError({ restoreDetails: true });
       document.getElementById('video-title').textContent = video.title;
       document.getElementById('video-description').innerHTML = Safe.description(video.description, { videoId, region: Route.parse(window.location.search).region });
@@ -364,7 +311,7 @@ function displayComments(videoId) {
     commentWrapper.textContent = 'No video selected.';
     return;
   }
-  currentComments = youtube().comments(videoId, { order: commentSort });
+  currentComments = Shell.youtube(API_KEY).comments(videoId, { order: commentSort });
   loadMoreComments(true);
 }
 
@@ -382,7 +329,7 @@ async function loadMoreComments(first = false) {
       commentWrapper.innerHTML = '';
       const msg = document.createElement('div');
       msg.className = 'video-error';
-      msg.textContent = messageForFailure(err, 'Error loading comments.');
+      msg.textContent = Shell.messageForFailure(err, 'Error loading comments.');
       commentWrapper.appendChild(msg);
     }
     else toggleLoadMoreButton(true); // allow retry

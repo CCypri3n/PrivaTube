@@ -26,6 +26,8 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 **Settings panel**: A gear button in the header (left of the region dropdown, both pages) opening a small modal styled like the other popups. Holds "Show Shorts" (checkbox) and "Forget API key" (calls `ApiKey.clearKey()`, then the key popup asks for a new key and the page re-renders). **Show Shorts** is a browser-only preference (`localStorage` `show_shorts`, default off, never in the URL) behind `Settings.getShowShorts()` / `Settings.setShowShorts()` in `web/settings.js` (pure, injectable storage, tolerant of broken storage and invalid values); the browse page passes it as `includeShorts` and re-renders the current listing on change. Panel wiring is `Settings.bindPanel`.
 
+**Shell module**: `web/shell.js`, global `Shell`. The code behind the top bar that both pages share, each taking page behaviour as callbacks: `Shell.messageForFailure` (pure, tested), `Shell.youtube(apiKey)`, `Shell.showRegion`, `Shell.bindRegion({ onPick })`, `Shell.bindSearch({ onSearch })` and `Shell.start(onKey)` (waits for the API key). Moving the shared markup into it is a later step (#7).
+
 **Share link**: A URL pointing back at PrivaTube rather than YouTube (the Pages site, `?v=<id>`, plus `&t=` when the player has a timecode; built by `Route.share`). Links in descriptions and comments are rewritten the same way.
 
 ## Layout
@@ -36,6 +38,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 - `web/route.js`: the Route module (loaded by both pages before the page scripts; tested in `tests/route.test.js`)
 - `web/safetext.js`: the Safe text module (loaded by both pages before the page scripts; tested in `tests/safetext.test.js`)
 - `web/settings.js`: the Settings module and settings panel wiring (loaded by both pages before `shorts.js`; tested in `tests/settings.test.js`)
+- `web/shell.js`: the Shell module (loaded by both pages after `youtube.js`, before the page scripts; failure mapping tested in `tests/shell.test.js`)
 - `web/shorts.js`: duration parser and Shorts predicate (also loaded by `tests/`)
 - `web/youtube.js`: the YouTube module (loaded after `shorts.js`, before `PrivaTube.js`; unit-tested with a fake fetch)
 - `web/styles.css`, `web/icons/`: shared styling and icons
