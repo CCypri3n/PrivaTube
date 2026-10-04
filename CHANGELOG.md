@@ -2,7 +2,7 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
-## 2026-10-05 — Safe text module: escape and URL-check all YouTube-supplied text (closes #6)
+## 2026-10-05 — Safe text module: escape and URL-check all YouTube-supplied text (closes #6) [5cd55f1, 17b80bc]
 - New pure `web/safetext.js` (`Safe.escape`, `url`, `urlAttr`, `description`, `comment`), loaded by both pages after `route.js`; tested in `tests/safetext.test.js` (hostile strings, URL schemes, link/timecode rewriting, comment sanitising, plus a static scan that API fields in `web/PrivaTube.js` / `web/VideoPlayer.js` templates go through `Safe`).
 - Fixes an XSS: titles, channel names, banner title, thumbnail/banner/avatar URLs, comment author names/avatars/dates and counts were interpolated into `innerHTML` unescaped (a title like `x" onerror="alert(1)` injected an attribute on the browse page). All of those now go through `Safe.escape` / `Safe.urlAttr`; non-http(s) image URLs become empty (comment avatars fall back to the unavailable-avatar icon).
 - Also from the URL, not the API: the player iframe is now built with DOM calls and an encoded id (`?v=` was spliced into HTML), and the region button uses `textContent` (`?lang=` was spliced into `innerHTML`) on both pages.
