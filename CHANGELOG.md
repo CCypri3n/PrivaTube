@@ -2,6 +2,11 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-04 — Fill YouTube module test gaps, document includeShorts
+- Added `tests/youtube-gaps.test.js`: when the refill bound is reached while more videos exist, `trending` and `channelUploads` return the partial batch with `hasMore` true (and the listing continues without repeats). Checked by breaking the bound and the end-of-list flag.
+- Already covered, left alone: `includeShorts` on `channelUploads` (`tests/youtube-channels.test.js`) and comment `order` reaching the request (`tests/youtube-video.test.js`, whose fake serves pages by the requested order; breaking it fails them).
+- `CONTEXT.md`: trending, search and channel uploads accept `includeShorts`; no page passes it yet (#14). No module behaviour changed. Closes #18.
+
 ## 2026-10-04 — YouTube module step 3: player page, video and comments
 - `web/youtube.js`: added `video(id)` (video plus its channel in one object, counts as numbers or null, unknown video fails with `not_found`) and `comments(id, { order })` (`relevance` or `time`; Listing-style `more()` with no duplicates and end reported; each call keeps its own position). `makeListing` gained an optional request bound (one request per comment batch).
 - `web/VideoPlayer.js`: only calls the module and renders; removed its inline video, channel and comment requests (API key validation stays, #4) and the global `nextPageToken`. Failures map to messages (not found, quota "try again tomorrow", invalid key, offline); changing the comment sort restarts the list. Fixed latent errors in the old comment code (undefined `video`/`commentsDiv`).
