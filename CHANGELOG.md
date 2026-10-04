@@ -2,6 +2,9 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-04 — Fix search crash without q in the address and stale channel banner (#17)
+- `web/PrivaTube.js`: `searchVideos` now declares `query` with `let` and `queryFromField` with `const`, so searching from the box works when the address has no `q` (it threw a `TypeError` before); empty search text just returns. `showHomepage` hides `#channel-banner` (`searchVideos` already did), so a previous channel's banner no longer stays above trending. Minimal fix; address handling is left for #5.
+
 ## 2026-10-04 — Channel page: one channels request, explicit failures (closes #15)
 - `web/youtube.js`: `channel(id)` now also returns `uploadsPlaylistId`; `channelUploads(id, { uploadsPlaylistId })` uses it and skips its own channels lookup (still works without it).
 - `web/PrivaTube.js`: channel mode awaits the info call first and builds the uploads listing from its result, so a channel load costs one channels request. The info call's failure reason decides the message: "Channel not found." for not_found, distinct quota / invalid key / offline messages otherwise (no longer swallowed).

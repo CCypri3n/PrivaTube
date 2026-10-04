@@ -82,6 +82,7 @@ async function headerClick() {
 // --- Homepage Trending Videos ---
 async function showHomepage(loadMore = false) {
   currentMode = 'home';
+  document.getElementById('channel-banner').style.display = 'none';
   const url = new URL(window.location);
   url.searchParams.delete('ch');
   url.searchParams.delete('v'); // Remove video param when going to homepage
@@ -121,17 +122,17 @@ async function searchVideos(loadMore = false) {
   url.searchParams.delete('t'); // Remove time param when going to search
   window.history.pushState({}, '', url);
   document.getElementById('channel-banner').style.display = 'none';
-  const query = url.searchParams.get('q')
+  let query = url.searchParams.get('q');
   console.log("Search query from URL:", query);
   if (!query) {
-    queryFromField = document.getElementById('searchQuery').value.trim();
+    const queryFromField = document.getElementById('searchQuery').value.trim();
     console.log("Search query from field:", queryFromField);
     url.searchParams.set('q', queryFromField);
     window.history.replaceState({}, '', url);
     query = url.searchParams.get('q');
     console.log("Search query from URL:", query);
   }
-  if (!query.trim()) return;
+  if (!query || !query.trim()) return;
   currentMode = 'search';
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
