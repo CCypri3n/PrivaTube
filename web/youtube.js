@@ -1,6 +1,6 @@
 /**
  * YouTube module: the single place that talks to the YouTube Data API v3 for
- * trending, search and channel listings (the player page follows in a later step).
+ * trending, search, channel, video and comment data.
  *
  * Plain script, no imports. Exposes one global, `YouTube`. No DOM, no localStorage.
  *
