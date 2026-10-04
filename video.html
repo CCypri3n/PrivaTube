@@ -9,35 +9,8 @@
 </head>
 
 <body>
-    <a href="" id="main-header-link">
-    <header class="main-header" style="cursor:pointer;">
-        <h1>PrivaTube</h1>
-        <h5>by YoutubeSwapper</h5>
-    </header>
-    </a>
-    
-    <div class="country-dropdown" id="country-dropdown">
-    <button id="country-code-btn">FR ▼</button>
-    <div class="country-list" id="country-list">
-        <div data-code="FR">🇫🇷 France</div>
-        <div data-code="DE">🇩🇪 Germany</div>
-        <div data-code="GB">🇬🇧 Britain</div>
-        <div data-code="ES">🇪🇸 Spain</div>
-        <div data-code="US">🇺🇸 USA</div>
-    </div>
-    </div>
-
-
-    <button id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">&#9881;</button>
-
-    <div class="search-bar-wrapper">
-        <div class="search-container">
-            <input type="text" id="searchQuery" class="search-input" placeholder="Type to search...">
-            <button class="search-btn" id="search-btn">
-              <img src="web/icons/search-96.svg" alt="Search" style="width:24px;height:24px;">
-            </button>
-        </div>
-    </div>
+    <script src="web/shell-markup.js"></script>
+    <script>ShellMarkup.insert();</script>
 
     <div id="video-player-wrapper">
         <div id="video"></div>
@@ -95,46 +68,6 @@
     <script src="web/youtube.js"></script>
     <script src="web/shell.js"></script>
     <script src="web/VideoPlayer.js"></script>
-
-    <div id="api-key-modal" style="display:none;">
-    <div class="api-key-modal-backdrop"></div>
-    <div class="api-key-modal-content">
-        <h2>Enter your YouTube API Key</h2>
-        <div id="api-key-error" style="color:crimson; margin-bottom:10px; display:none;"></div>
-        <input type="password" id="api-key-input" placeholder="Paste your API key here">
-        <button id="api-key-save-btn">Save</button>
-        <p class="attention" style="margin-top:8px;">Your key is stored only in your browser.</p>
-    </div>
-    </div>
-
-    <div id="settings-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-    <div class="api-key-modal-backdrop"></div>
-    <div class="api-key-modal-content settings-card">
-        <div class="settings-head">
-            <h2 id="settings-title">Settings</h2>
-            <button id="settings-close-btn" class="settings-close" type="button" aria-label="Close settings" title="Close">&times;</button>
-        </div>
-        <div class="settings-group">
-            <label class="settings-row" for="settings-shorts-toggle">
-                <span class="settings-text">
-                    <span class="settings-label">Show Shorts</span>
-                    <span class="settings-hint">Include short vertical videos in lists</span>
-                </span>
-                <span class="switch">
-                    <input type="checkbox" role="switch" id="settings-shorts-toggle">
-                    <span class="switch-track" aria-hidden="true"></span>
-                </span>
-            </label>
-            <div class="settings-row">
-                <span class="settings-text">
-                    <span class="settings-label">API key</span>
-                    <span class="settings-hint">Stored only in this browser</span>
-                </span>
-                <button id="settings-forget-key-btn" class="settings-forget" type="button">Forget</button>
-            </div>
-        </div>
-    </div>
-    </div>
 
     <div id="share-modal" style="display:none;">
     <div class="api-key-modal-backdrop"></div>
