@@ -3,11 +3,12 @@
  * against Google and storage of the key.
  *
  * Public interface: ApiKey.getKey() -> Promise<string>, ApiKey.clearKey().
- * ApiKey.create({ storage, fetch, ui }) builds an instance with injected
+ * ApiKey.create({ storage, fetchFn, ui, doc }) builds an instance with injected
  * seams (tests use fakes; defaults are localStorage, fetch and the popup).
  *
- * ui seam: ask() -> Promise<string> (shows the popup, resolves with the typed
- * key on Save), showError(msg), hideError(), close().
+ * ui seam: open() (show the popup empty, no error; throws if markup is
+ * incomplete), ask() -> Promise<string> (resolves with the typed key on Save
+ * or Enter), showError(msg), hideError(), close(). doc: optional document.
  */
 const ApiKey = (function () {
   const STORAGE_NAME = 'api_key';
@@ -15,41 +16,65 @@ const ApiKey = (function () {
   // Google answers 403 with one of these reasons when the key is fine but out of quota.
   const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'rateLimitExceeded'];
 
-  // Check a key against Google: 'valid' | 'quota' | 'invalid' | 'network'
+  // Check a key against Google: 'accepted' | 'rejected' | 'try-again'
+  // accepted: Google says the key is valid, or valid but out of quota.
+  // rejected: Google says the key is bad (400, or 403 that is not a quota error).
+  // try-again: anything else (network failure, 5xx, 429, ...): not the key's fault.
   async function checkKey(fetchFn, key) {
     let resp;
     try {
       resp = await fetchFn(CHECK_URL + encodeURIComponent(key));
     } catch (err) {
-      return 'network';
+      return 'try-again';
     }
-    if (resp.ok) return 'valid';
-    try {
-      const body = await resp.json();
-      const errors = (body && body.error && body.error.errors) || [];
-      if (errors.some(e => QUOTA_REASONS.includes(e.reason))) return 'quota';
-    } catch (err) {
-      // unreadable body: fall through to invalid
+    if (resp.ok) return 'accepted';
+    if (resp.status !== 400 && resp.status !== 403) return 'try-again';
+    if (resp.status === 403) {
+      try {
+        const body = await resp.json();
+        const errors = (body && body.error && body.error.errors) || [];
+        if (errors.some(e => QUOTA_REASONS.includes(e.reason))) return 'accepted';
+      } catch (err) {
+        // unreadable body: a 403 that is not a quota error
+      }
     }
-    return 'invalid';
+    return 'rejected';
   }
 
   // The popup defined by the identical #api-key-modal markup in both pages.
-  function createDomUI() {
-    const el = id => document.getElementById(id);
+  // `doc` is injectable for tests (defaults to the global document, resolved lazily).
+  function createDomUI(doc) {
+    const d = () => doc || document;
+    const IDS = ['api-key-modal', 'api-key-input', 'api-key-save-btn', 'api-key-error'];
+    const el = id => {
+      const node = d().getElementById(id);
+      if (!node) throw new Error('API key popup markup is incomplete: missing #' + id);
+      return node;
+    };
     return {
+      // Show the popup fresh: empty input, no error. Throws if markup is incomplete.
+      open() {
+        IDS.forEach(el);
+        el('api-key-input').value = '';
+        el('api-key-error').style.display = 'none';
+        el('api-key-modal').style.display = 'flex';
+      },
+      // Call after open(), which already validated the markup.
       ask() {
         return new Promise(resolve => {
-          const input = el('api-key-input');
-          const btn = el('api-key-save-btn');
-          el('api-key-modal').style.display = 'flex';
+          const input = d().getElementById('api-key-input');
+          const btn = d().getElementById('api-key-save-btn');
           input.focus();
           const done = () => {
             btn.removeEventListener('click', done);
             input.removeEventListener('keydown', onKey);
             resolve(input.value);
           };
-          const onKey = e => { if (e.key === 'Enter') done(); };
+          const onKey = e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            done();
+          };
           btn.addEventListener('click', done);
           input.addEventListener('keydown', onKey);
         });
@@ -68,37 +93,50 @@ const ApiKey = (function () {
     };
   }
 
-  function create({ storage, fetch: fetchFn, ui } = {}) {
+  function create({ storage, fetchFn, ui, doc } = {}) {
     // Defaults are resolved lazily so the module loads before the DOM exists.
     const store = () => storage || localStorage;
     const net = (...args) => (fetchFn || fetch)(...args);
     let popup = ui;
-    const getUI = () => popup || (popup = createDomUI());
+    const getUI = () => popup || (popup = createDomUI(doc));
+    let pending = null; // the one in-flight popup session, shared by concurrent callers
 
-    async function getKey() {
+    async function askUntilAccepted() {
       const saved = store().getItem(STORAGE_NAME);
       if (saved && saved.trim()) return saved.trim();
 
       const view = getUI();
-      for (;;) {
-        const key = ((await view.ask()) || '').trim();
-        if (!key) {
-          view.showError('Please enter an API key.');
-          continue;
+      view.open();
+      try {
+        for (;;) {
+          const key = ((await view.ask()) || '').trim();
+          if (!key) {
+            view.showError('Please enter an API key.');
+            continue;
+          }
+          const result = await checkKey(net, key);
+          if (result === 'accepted') {
+            store().setItem(STORAGE_NAME, key);
+            view.hideError();
+            return key;
+          }
+          view.showError(
+            result === 'try-again'
+              ? 'Could not check the key right now. Please try again in a moment.'
+              : 'Invalid API Key. Please try again.'
+          );
         }
-        const result = await checkKey(net, key);
-        if (result === 'valid' || result === 'quota') {
-          store().setItem(STORAGE_NAME, key);
-          view.hideError();
-          view.close();
-          return key;
-        }
-        view.showError(
-          result === 'network'
-            ? 'Network error. Please try again.'
-            : 'Invalid API Key. Please try again.'
-        );
+      } finally {
+        view.close(); // also on unexpected failure, so no stale modal remains
       }
+    }
+
+    function getKey() {
+      // Never throws synchronously: storage errors become rejections.
+      if (!pending) {
+        pending = askUntilAccepted().finally(() => { pending = null; });
+      }
+      return pending;
     }
 
     function clearKey() {

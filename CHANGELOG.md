@@ -2,6 +2,17 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-05 — API key popup follow-ups: try-again outcome, reset state, shared pending promise (closes #19) [ca1480c, e95b8c3]
+- `web/apikey.js`: the key check now has three outcomes: accepted (OK, or 403 quota exceeded), rejected (400, or a non-quota 403: "Invalid API Key") and try-again (network error, 5xx, 429 and any other answer: "try again in a moment", key not saved). Before, any non-quota failure blamed the key.
+- The popup opens with an empty input and the error hidden every time (new `open()` ui step, once per popup session; errors still persist between retries). Previously the last typed key survived "forget".
+- Concurrent `getKey()` calls share one pending promise (one popup, one check, one result), reset once settled.
+- Incomplete popup markup makes `getKey()` reject with an error naming the missing element instead of hanging.
+- The `create` option `fetch` is renamed `fetchFn` so it no longer shadows the global (no callers passed it); `create` also takes an optional `doc`. `getKey`/`clearKey` unchanged.
+- Note for the #4 entry: pressing Enter in the key input now submits the popup (like clicking Save).
+- Tests: 5xx/503/500/429, concurrent calls, whitespace-only and padded saved values, Enter key, Save click and listener removal, reset on reopen, missing markup, via a tiny fake document. Not checked in a real browser (the issue's by-hand check with a real key is still to do).
+- Hardening after review: `getKey()` never throws synchronously (a throwing storage becomes a rejection); the popup is closed if asking or checking fails unexpectedly; Enter calls `preventDefault()`; `ask()` no longer re-validates markup that `open()` checked. Tests added for these and for `getKey()` working again after a rejection; the reset-on-reopen test no longer relies on timers.
+- Closes #19.
+
 ## 2026-10-05 — Player page: keep region select on the player URL (#5)
 - `web/VideoPlayer.js`: changing the region on the player page rebuilds the `video.html?v=` href instead of `Route.href`, which parsed a page without `v` as home and rewrote the address to `index.html`. Review fix for the Route module (#5).
 
@@ -10,7 +21,7 @@ One entry per commit, newest first. Each entry: date, commit subject, what chang
 - `web/PrivaTube.js` and `web/VideoPlayer.js` no longer touch `URLSearchParams`: removed the per-handler param clearing, the four `lang=FR` defaults, both copies of `createVideoUrl`/`createChannelUrl`, the mode derivation (country select and page load) and the hardcoded share link, which now keeps `t`.
 - Behaviour changes: navigating to a channel drops `q` and `t` (a leftover `q` made a reload show search); going home drops other params and writes `lang` in one history entry; searching from the player page now encodes `q` like the browse page does; timecode links in descriptions carry the region; invalid `t` (non-integer) is ignored.
 
-## 2026-10-04 — API key module: shared popup, check and storage (closes #4)
+## 2026-10-04 — API key module: shared popup, check and storage (closes #4) [f394400]
 - New `web/apikey.js` (`ApiKey.getKey()`, `ApiKey.clearKey()`, `ApiKey.create({ storage, fetch, ui })`); loaded by both pages before the page scripts. Deleted the duplicated `fetchApiKey` from `web/PrivaTube.js` and `web/VideoPlayer.js`.
 - The check now distinguishes rejected (invalid message, not saved), quota exceeded (key is valid: saved) and network error (network message, not saved); the error is hidden on the next success.
 - `video.html` key input is now `type="password"` like `index.html`; popup markup is identical.
