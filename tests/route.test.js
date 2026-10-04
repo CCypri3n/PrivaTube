@@ -49,6 +49,11 @@ test('parse: q decoding matches the page (encodeURIComponent inside the param)',
   await t.test('double-encoded q (as the index page writes it) gives the typed text', () => {
     assert.equal(Route.parse('?q=' + encodeURIComponent(encodeURIComponent('a b&c'))).query, 'a b&c');
   });
+  await t.test('once-encoded and old double-encoded AT&T both parse to AT&T', () => {
+    assert.equal(Route.parse('?q=AT%26T').query, 'AT&T');
+    assert.equal(Route.parse('?q=AT%2526T').query, 'AT&T');
+    assert.equal(Route.parse('?q=AT%26T').mode, 'search');
+  });
   await t.test('single-encoded q (old player page links) still works', () => {
     assert.equal(Route.parse('?q=a%20b').query, 'a b');
   });
@@ -93,10 +98,20 @@ test('hrefs', async (t) => {
     assert.equal(Route.video('V1', { t: null }), 'video.html?v=V1&lang=FR');
     assert.equal(Route.video('V1', { t: 'junk' }), 'video.html?v=V1&lang=FR');
   });
-  await t.test('search encodes q the way the index page does today', () => {
-    const href = Route.search('a b&c', { region: 'ES' });
-    const expected = new URLSearchParams({ q: encodeURIComponent('a b&c') }).toString() + '&lang=ES';
-    assert.equal(href, 'index.html?' + expected);
+  await t.test('search stores the text once-encoded (AT&T -> AT%26T, not AT%2526T)', () => {
+    assert.equal(Route.search('AT&T', { region: 'ES' }), 'index.html?q=AT%26T&lang=ES');
+    assert.equal(Route.search('a b'), 'index.html?q=a+b&lang=FR');
+  });
+  await t.test('search href parses back to the typed text', () => {
+    ['AT&T', 'a b&c', 'cafe \u00e9', '50%', 'x=y?z#w'].forEach((text) => {
+      assert.equal(Route.parse(Route.search(text)).query, text);
+    });
+  });
+  await t.test('listing video links carry t only when passed explicitly', () => {
+    const current = Route.parse('?v=X&lang=DE&t=90');
+    assert.equal(Route.video('V1', { region: current.region }), 'video.html?v=V1&lang=DE');
+    assert.equal(Route.video('V1', { region: current.region, t: 90 }), 'video.html?v=V1&lang=DE&t=90');
+    assert.equal(Route.channel('UC1', { region: current.region }), 'index.html?ch=UC1&lang=DE');
   });
   await t.test('share link points at the Pages site, includes t when present', () => {
     assert.equal(Route.share('V1'), 'https://ccypri3n.github.io/PrivaTube/?v=V1');

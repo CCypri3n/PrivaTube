@@ -2,6 +2,12 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-05 — Route follow-ups: popstate re-render, no t inheritance, once-encoded search (closes #20)
+- `web/PrivaTube.js`: new `popstate` handler (`renderFromAddress`) reads the address through `Route.parse` and re-renders trending, search or channel (Back from a channel to home shows trending and hides the banner; search -> channel -> Back/Forward round-trips). It sets a flag so the render functions do not `pushState` (no new entries, no loops) and fills the search box from the address. Address writes now go through `pushAddress`, which also skips "load more" and an address identical to the current one (a search was pushed twice, by the caller and by `searchVideos`; the region select re-pushed the same channel/search address).
+- Video, channel and search links built by the browse page get `currentRegion()` (`{ region }` only) instead of the whole parsed route, so a `t` in the address no longer leaks onto every video link (`playVideo` too). An explicit `t` still works.
+- `web/route.js`: `Route.search` stores the text encoded once (`AT&T` -> `q=AT%26T`, was `AT%2526T`). `parse` is unchanged: old double-encoded and new once-encoded addresses both give `AT&T`. Limit: text that itself looks like an escape (typed `a%20b`) now reads back as `a b`; inherent to accepting both forms.
+- Tests in `tests/route.test.js` (once-encoded build, both forms parse, round-trips, `t` not leaking, explicit `t`). Popstate handling checked by hand in a browser with stubbed YouTube data (no real key).
+
 ## 2026-10-05 — Safe text module: escape and URL-check all YouTube-supplied text (closes #6) [5cd55f1, 17b80bc]
 - New pure `web/safetext.js` (`Safe.escape`, `url`, `urlAttr`, `description`, `comment`), loaded by both pages after `route.js`; tested in `tests/safetext.test.js` (hostile strings, URL schemes, link/timecode rewriting, comment sanitising, plus a static scan that API fields in `web/PrivaTube.js` / `web/VideoPlayer.js` templates go through `Safe`).
 - Fixes an XSS: titles, channel names, banner title, thumbnail/banner/avatar URLs, comment author names/avatars/dates and counts were interpolated into `innerHTML` unescaped (a title like `x" onerror="alert(1)` injected an attribute on the browse page). All of those now go through `Safe.escape` / `Safe.urlAttr`; non-http(s) image URLs become empty (comment avatars fall back to the unavailable-avatar icon).

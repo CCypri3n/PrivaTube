@@ -31,6 +31,38 @@ function formatSeconds(total) {
 }
 
 
+// Address updates. Not while re-rendering from Back/Forward (the address is
+// already right; pushing would add entries and break Forward), nor on "load more".
+let restoringFromHistory = false;
+// Builder options carrying only the region from the address: never the whole
+// parsed route, so `t` (or anything else) can't leak into links.
+function currentRegion() {
+  return { region: Route.parse(window.location.search).region };
+}
+function pushAddress(href, loadMore) {
+  if (restoringFromHistory || loadMore) return;
+  if (new URL(href, window.location.href).href === window.location.href) return; // same address: no duplicate entry
+  window.history.pushState({}, '', href);
+}
+
+// Back/Forward: render the mode the address now describes, without pushing.
+// (The player page is a separate document, so 'video' never lands here.)
+function renderFromAddress() {
+  const route = Route.parse(window.location.search);
+  lastRegionCode = route.region;
+  const box = document.getElementById('searchQuery');
+  if (box) box.value = route.mode === 'search' ? route.query : '';
+  restoringFromHistory = true;
+  try {
+    if (route.mode === 'search') searchVideos();
+    else if (route.mode === 'channel') fetchChannelVideos(route.channelId);
+    else if (route.mode === 'home') showHomepage();
+  } finally {
+    restoringFromHistory = false; // pushes happen synchronously, before the first await
+  }
+}
+window.addEventListener('popstate', renderFromAddress);
+
 async function headerClick() {
   showHomepage();
 }
@@ -40,7 +72,7 @@ async function showHomepage(loadMore = false) {
   currentMode = 'home';
   document.getElementById('channel-banner').style.display = 'none';
   lastRegionCode = Route.parse(window.location.search).region;
-  window.history.pushState({}, '', Route.home({ region: lastRegionCode }));
+  pushAddress(Route.home({ region: lastRegionCode }), loadMore);
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading trending videos...</p>";
@@ -64,7 +96,7 @@ async function searchVideos(loadMore = false) {
   const query = route.query || document.getElementById('searchQuery').value.trim();
   document.getElementById('channel-banner').style.display = 'none';
   if (!query.trim()) return;
-  window.history.pushState({}, '', Route.search(query, route));
+  pushAddress(Route.search(query, currentRegion()), loadMore);
   currentMode = 'search';
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
@@ -88,7 +120,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   window.scrollTo(0, 0);
   currentMode = 'channel';
   lastChannelId = channelId;
-  window.history.pushState({}, '', Route.channel(channelId, Route.parse(window.location.search)));
+  pushAddress(Route.channel(channelId, currentRegion()), loadMore);
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
   const yt = getYouTube();
@@ -155,7 +187,7 @@ function renderItem(item) {
       : '';
     return `
         <div class="video-item">
-            <a href="${Safe.escape(Route.video(item.id, Route.parse(window.location.search)))}" target="_self">
+            <a href="${Safe.escape(Route.video(item.id, currentRegion()))}" target="_self">
               <div class="video-thumb-container">
                 <img src="${Safe.urlAttr(item.thumbnail)}" alt="${Safe.escape(item.title)}" />
                 <span class="video-duration">${Safe.escape(formatSeconds(item.duration))}</span>
@@ -165,7 +197,7 @@ function renderItem(item) {
             <div class="video-meta">
             <span class="video-date">${Safe.escape(dateStr)}</span>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
-            <a href="${Safe.escape(Route.channel(item.channelId, Route.parse(window.location.search)))}" class="channel-link" target="_self">
+            <a href="${Safe.escape(Route.channel(item.channelId, currentRegion()))}" class="channel-link" target="_self">
                 ${Safe.escape(item.channelTitle)}
             </a>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
@@ -177,7 +209,7 @@ function renderItem(item) {
         `;
   } else if (item.kind === 'channel') {
     return `
-    <a href="${Safe.escape(Route.channel(item.id, Route.parse(window.location.search)))}" target="_self">
+    <a href="${Safe.escape(Route.channel(item.id, currentRegion()))}" target="_self">
       <div class="channel-item" data-channel-id="${Safe.escape(item.id)}">
         <img src="${Safe.urlAttr(item.thumbnail)}" alt="${Safe.escape(item.title)}" />
         <h3>${Safe.escape(item.title)}</h3>
@@ -207,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
   input.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
-      window.history.pushState({}, '', Route.search(input.value.trim(), Route.parse(window.location.search)));
+      window.history.pushState({}, '', Route.search(input.value.trim(), currentRegion()));
       searchVideos();
     }
   });
@@ -295,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   const searchBtn = document.getElementById('search-btn');
   if (searchBtn) {
     searchBtn.addEventListener('click', function() {
-      window.history.pushState({}, '', Route.search(input.value.trim(), Route.parse(window.location.search)));
+      window.history.pushState({}, '', Route.search(input.value.trim(), currentRegion()));
       searchVideos();
     });
   }
@@ -304,5 +336,5 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
 
 async function playVideo(videoId) {
   window.scrollTo(0, 0);
-  window.location.href = Route.video(videoId, Route.parse(window.location.search));
+  window.location.href = Route.video(videoId, currentRegion());
 }

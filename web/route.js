@@ -6,7 +6,8 @@
  * Route.parse(urlOrSearch) -> { mode, region, videoId, channelId, query, t }
  *   mode: 'video' (v) wins over 'search' (q) wins over 'channel' (ch), else 'home'.
  *   region defaults to 'FR'. query is the typed text (decoded the way the page
- *   always has: the q param holds an encodeURIComponent'd string). t is a
+ *   always has: old links hold a double-encoded value, which still parses; new
+ *   links hold the text encoded once, written by search()). t is a
  *   non-negative integer (seconds) or null. Empty/junk params are ignored.
  * Route.home / channel / video / search / href build hrefs (relative to the
  * pages); Route.share builds the link to give to other people.
@@ -77,7 +78,7 @@ const Route = (function () {
   }
 
   function search(text, options) {
-    return build('index.html', [['q', encodeURIComponent(text)], ['lang', regionOf(options)]]);
+    return build('index.html', [['q', text], ['lang', regionOf(options)]]);
   }
 
   // Href for a parsed route (e.g. the same page with another region).
