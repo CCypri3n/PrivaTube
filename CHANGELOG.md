@@ -2,6 +2,14 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-05 — Safe text module: escape and URL-check all YouTube-supplied text (closes #6)
+- New pure `web/safetext.js` (`Safe.escape`, `url`, `urlAttr`, `description`, `comment`), loaded by both pages after `route.js`; tested in `tests/safetext.test.js` (hostile strings, URL schemes, link/timecode rewriting, comment sanitising, plus a static scan that API fields in `web/PrivaTube.js` / `web/VideoPlayer.js` templates go through `Safe`).
+- Fixes an XSS: titles, channel names, banner title, thumbnail/banner/avatar URLs, comment author names/avatars/dates and counts were interpolated into `innerHTML` unescaped (a title like `x" onerror="alert(1)` injected an attribute on the browse page). All of those now go through `Safe.escape` / `Safe.urlAttr`; non-http(s) image URLs become empty (comment avatars fall back to the unavailable-avatar icon).
+- Also from the URL, not the API: the player iframe is now built with DOM calls and an encoded id (`?v=` was spliced into HTML), and the region button uses `textContent` (`?lang=` was spliced into `innerHTML`) on both pages.
+- Removed the inline `onclick="fetchChannelVideos('<id>')"` on channel results (an id with `'` could escape the JS string); the wrapping link already navigates to the channel.
+- `Safe.description(text, { videoId, region })` replaces `youtubeDescriptiontoPrivaTube` + `linkify`: escapes, rewrites YouTube watch / youtu.be / channel links to `video.html?v=` / `index.html?ch=` (keeping `t`), links timecodes to the given video (`&t=`; plain text if no video id; the current video is an argument, not `lastPlayedVideoId`), and makes other http(s) links open with `target="_blank" rel="noopener noreferrer"`. Trailing punctuation is no longer part of a link.
+- `Safe.comment(textDisplay)` replaces `youtubeCommentPrivaTube`: keeps only `<br>` and `<a href>` (href decoded, URL-checked, YouTube links rewritten, external ones hardened); `javascript:`/`data:` anchors become plain text; every other tag is shown as text. The YouTube module output is unchanged.
+
 ## 2026-10-05 — API key popup follow-ups: try-again outcome, reset state, shared pending promise (closes #19) [ca1480c, e95b8c3]
 - `web/apikey.js`: the key check now has three outcomes: accepted (OK, or 403 quota exceeded), rejected (400, or a non-quota 403: "Invalid API Key") and try-again (network error, 5xx, 429 and any other answer: "try again in a moment", key not saved). Before, any non-quota failure blamed the key.
 - The popup opens with an empty input and the error hidden every time (new `open()` ui step, once per popup session; errors still persist between retries). Previously the last typed key survived "forget".

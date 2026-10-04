@@ -104,8 +104,8 @@ async function fetchChannelVideos(channelId, loadMore = false) {
       bannerDiv.style.display = 'block';
       bannerDiv.innerHTML = `
           <div class="channel-banner-inner">
-          ${channel.banner ? `<img class="channel-banner-img" src="${channel.banner}" alt="">` : ''}
-          <div class="channel-banner-title">${channel.title}</div>
+          ${Safe.url(channel.banner) ? `<img class="channel-banner-img" src="${Safe.urlAttr(channel.banner)}" alt="">` : ''}
+          <div class="channel-banner-title">${Safe.escape(channel.title)}</div>
           </div>
       `;
     } catch (error) {
@@ -155,34 +155,34 @@ function renderItem(item) {
       : '';
     return `
         <div class="video-item">
-            <a href="${Route.video(item.id, Route.parse(window.location.search))}" target="_self">
+            <a href="${Safe.escape(Route.video(item.id, Route.parse(window.location.search)))}" target="_self">
               <div class="video-thumb-container">
-                <img src="${item.thumbnail}" alt="${item.title}" />
-                <span class="video-duration">${formatSeconds(item.duration)}</span>
+                <img src="${Safe.urlAttr(item.thumbnail)}" alt="${Safe.escape(item.title)}" />
+                <span class="video-duration">${Safe.escape(formatSeconds(item.duration))}</span>
               </div>
             </a>
-            <h3>${item.title}</h3>
+            <h3>${Safe.escape(item.title)}</h3>
             <div class="video-meta">
-            <span class="video-date">${dateStr}</span>
+            <span class="video-date">${Safe.escape(dateStr)}</span>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
-            <a href="${Route.channel(item.channelId, Route.parse(window.location.search))}" class="channel-link" target="_self">
-                ${item.channelTitle}
+            <a href="${Safe.escape(Route.channel(item.channelId, Route.parse(window.location.search)))}" class="channel-link" target="_self">
+                ${Safe.escape(item.channelTitle)}
             </a>
             <span class="video-meta-sep">&nbsp;•&nbsp;</span>
             <span class="video-views-render">
-                ${item.viewCount !== null ? item.viewCount.toLocaleString() : 'N/A'} views
+                ${Safe.escape(item.viewCount !== null ? item.viewCount.toLocaleString() : 'N/A')} views
             </span>
             </div>
         </div>
         `;
   } else if (item.kind === 'channel') {
     return `
-    <a href="${Route.channel(item.id, Route.parse(window.location.search))}" target="_self">
-      <div class="channel-item" data-channel-id="${item.id}" onclick="fetchChannelVideos('${item.id}')">
-        <img src="${item.thumbnail}" alt="${item.title}" />
-        <h3>${item.title}</h3>
+    <a href="${Safe.escape(Route.channel(item.id, Route.parse(window.location.search)))}" target="_self">
+      <div class="channel-item" data-channel-id="${Safe.escape(item.id)}">
+        <img src="${Safe.urlAttr(item.thumbnail)}" alt="${Safe.escape(item.title)}" />
+        <h3>${Safe.escape(item.title)}</h3>
         <p class="attention">Click to view channel videos</p>
-        <p class="subs">${item.subscriberCount !== null ? `${item.subscriberCount.toLocaleString()} subscribers` : ''}</p>
+        <p class="subs">${Safe.escape(item.subscriberCount !== null ? `${item.subscriberCount.toLocaleString()} subscribers` : '')}</p>
       </div>
     </a>
     `;
@@ -232,14 +232,14 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   document.title = `PrivaTube - ${lastRegionCode}`;
   // Update the button display
   if (btn) {
-    btn.innerHTML = `${lastRegionCode} ▼`;
+    btn.textContent = `${lastRegionCode} ▼`;
   }
 
   // Handle country selection
   list.querySelectorAll('div').forEach(item => {
   item.addEventListener('click', (e) => {
     const code = item.getAttribute('data-code');
-    btn.innerHTML = `${code} ▼`;
+    btn.textContent = `${code} ▼`;
     list.style.display = 'none';
     btn.classList.remove('active');
     lastRegionCode = code;
