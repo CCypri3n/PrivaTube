@@ -88,11 +88,11 @@ test('description: empty and non-strings', () => {
 
 test('description: YouTube links become PrivaTube links', () => {
   const cases = [
-    ['see https://www.youtube.com/watch?v=aaaaaaaaaaa now', 'video.html?v=aaaaaaaaaaa'],
-    ['see https://youtu.be/aaaaaaaaaaa now', 'video.html?v=aaaaaaaaaaa'],
-    ['see https://youtube.com/watch?v=aaaaaaaaaaa&t=90s now', 'video.html?v=aaaaaaaaaaa&t=90'],
-    ['see https://youtu.be/aaaaaaaaaaa?t=45 now', 'video.html?v=aaaaaaaaaaa&t=45'],
-    ['see https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa now', 'index.html?ch=UCaaaaaaaaaaaaaaaaaaaaaa']
+    ['see https://www.youtube.com/watch?v=aaaaaaaaaaa now', 'video.html?v=aaaaaaaaaaa&lang=FR'],
+    ['see https://youtu.be/aaaaaaaaaaa now', 'video.html?v=aaaaaaaaaaa&lang=FR'],
+    ['see https://youtube.com/watch?v=aaaaaaaaaaa&t=90s now', 'video.html?v=aaaaaaaaaaa&lang=FR&t=90'],
+    ['see https://youtu.be/aaaaaaaaaaa?t=45 now', 'video.html?v=aaaaaaaaaaa&lang=FR&t=45'],
+    ['see https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa now', 'index.html?ch=UCaaaaaaaaaaaaaaaaaaaaaa&lang=FR']
   ];
   for (const [text, href] of cases) {
     const out = Safe.description(text, { videoId: ID });
@@ -104,9 +104,9 @@ test('description: YouTube links become PrivaTube links', () => {
 
 test('description: timecodes link to the current video', () => {
   let out = Safe.description('0:00 intro\n1:02:03 end 12:34', { videoId: ID });
-  assert.ok(out.includes(`<a href="video.html?v=${ID}&amp;t=0">0:00</a>`), out);
-  assert.ok(out.includes(`&amp;t=3723">1:02:03</a>`), out);
-  assert.ok(out.includes(`&amp;t=754">12:34</a>`), out);
+  assert.ok(out.includes(`<a href="video.html?v=${ID}&amp;lang=FR&amp;t=0">0:00</a>`), out);
+  assert.ok(out.includes(`&amp;lang=FR&amp;t=3723">1:02:03</a>`), out);
+  assert.ok(out.includes(`&amp;lang=FR&amp;t=754">12:34</a>`), out);
   out = Safe.description('1:05', { videoId: ID, region: 'DE' });
   assert.ok(out.includes(`<a href="video.html?v=${ID}&amp;lang=DE&amp;t=65">1:05</a>`), out);
 });
@@ -155,9 +155,9 @@ test('comment: external anchor kept and hardened', () => {
 
 test('comment: YouTube anchors become PrivaTube links, timecode anchors too', () => {
   let out = Safe.comment('<a href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=12">0:12</a>');
-  assert.equal(out, '<a href="video.html?v=aaaaaaaaaaa&amp;t=12">0:12</a>');
+  assert.equal(out, '<a href="video.html?v=aaaaaaaaaaa&amp;lang=FR&amp;t=12">0:12</a>');
   out = Safe.comment('<a href="https://youtu.be/aaaaaaaaaaa?t=7">https://youtu.be/aaaaaaaaaaa?t=7</a>');
-  assert.equal(out, '<a href="video.html?v=aaaaaaaaaaa&amp;t=7">video.html?v=aaaaaaaaaaa&amp;t=7</a>');
+  assert.equal(out, '<a href="video.html?v=aaaaaaaaaaa&amp;lang=FR&amp;t=7">video.html?v=aaaaaaaaaaa&amp;lang=FR&amp;t=7</a>');
 });
 
 test('comment: other markup is shown as text', () => {
@@ -189,6 +189,42 @@ test('comment: javascript: / data: hrefs are neutralised', () => {
 test('comment: attribute breakout in href cannot add attributes', () => {
   const out = Safe.comment('<a href="https://example.com/&quot;onmouseover=&quot;x">t</a>');
   assert.ok(/^<a href="[^"]*" target="_blank" rel="noopener noreferrer">t<\/a>$/.test(out), out);
+});
+
+test('comment: a YouTube URL used as the visible link text is shown as the PrivaTube relative link', () => {
+  const out = Safe.comment('<a href="https://www.youtube.com/watch?v=aaaaaaaaaaa">https://www.youtube.com/watch?v=aaaaaaaaaaa</a>', { region: 'DE' });
+  assert.equal(out, '<a href="video.html?v=aaaaaaaaaaa&amp;lang=DE">video.html?v=aaaaaaaaaaa&amp;lang=DE</a>');
+  assert.ok(!out.includes('youtube.com'));
+  // non-URL visible text is kept
+  assert.equal(Safe.comment('<a href="https://youtu.be/aaaaaaaaaaa">watch this</a>'), '<a href="video.html?v=aaaaaaaaaaa&amp;lang=FR">watch this</a>');
+});
+
+test('urls are built by the injected Route (URL format is owned by route.js)', () => {
+  const calls = [];
+  const fake = Safe.create({ route: {
+    video: (id, o) => { calls.push(['video', id, o]); return 'V(' + id + ',' + o.t + ')'; },
+    channel: (id, o) => { calls.push(['channel', id, o]); return 'C(' + id + ')'; }
+  } });
+  assert.equal(fake.description('https://youtu.be/aaaaaaaaaaa?t=5', {}), '<a href="V(aaaaaaaaaaa,5)">V(aaaaaaaaaaa,5)</a>');
+  assert.ok(fake.description('1:02', { videoId: ID, region: 'ES' }).includes('<a href="V(' + ID + ',62)">'));
+  assert.ok(fake.comment('<a href="https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa">x</a>').includes('href="C(UCaaaaaaaaaaaaaaaaaaaaaa)"'));
+  assert.deepEqual(calls[1][2], { region: 'ES', t: 62 });
+});
+
+test('description: timecodes with minutes/seconds >= 60 stay text', () => {
+  for (const tc of ['99:99', '1:60', '12:34:99', '1:99:10', '99:99:99', '0:75']) {
+    assert.equal(Safe.description('at ' + tc + ' x', { videoId: ID }), 'at ' + tc + ' x', tc);
+  }
+  assert.ok(Safe.description('59:59', { videoId: ID }).includes('&amp;t=3599"'));
+  assert.ok(Safe.description('99:59:59', { videoId: ID }).includes('&amp;t=359999"'));
+  assert.equal(Safe.MAX_SECONDS, 359999);
+});
+
+test('t values in YouTube links: digits with optional s only, capped', () => {
+  const t = u => Safe.description(u, {});
+  assert.ok(t('https://youtu.be/aaaaaaaaaaa?t=1h2m').includes('href="video.html?v=aaaaaaaaaaa&amp;lang=FR"'));
+  assert.ok(t('https://youtu.be/aaaaaaaaaaa?t=360000').includes('href="video.html?v=aaaaaaaaaaa&amp;lang=FR"'));
+  assert.ok(t('https://youtu.be/aaaaaaaaaaa?t=359999s').includes('&amp;t=359999"'));
 });
 
 // --- static scan: API-supplied fields must not reach HTML unescaped ---

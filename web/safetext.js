@@ -1,7 +1,21 @@
 /**
  * Safe text module - the only place untrusted text (anything YouTube sends:
  * titles, channel names, descriptions, comments, URLs) is turned into HTML.
- * Pure: no imports, no DOM, no network.
+ * Pure: no DOM, no network. URL formats are owned by Route (web/route.js): the
+ * builders are injected with Safe.create({ route }); the default Safe uses the global
+ * Route in the browser (route.js is loaded first) and require('./route.js') under Node.
+ *
+ * Link contract (Safe.url): absolute links must be http: or https: (any case). Relative
+ * links are accepted only as lowercase `video.html` / `index.html` followed by `?`, `#` or
+ * the end of the string; they stay relative so hosting under a subpath works. Everything
+ * else (javascript:, data:, //host, whitespace or control characters anywhere, other
+ * relative paths) gets the fallback. User-info (https://user@host) and punycode /
+ * homograph hosts are accepted by design: links are only displayed as text and opened with
+ * target="_blank" rel="noopener noreferrer", and we do not try to judge hosts.
+ *
+ * Timecodes: m:ss or h:mm:ss, minutes (with hours) and seconds must be below 60, else the
+ * text stays text. Seconds are capped at Safe.MAX_SECONDS (359999 = 99:59:59, the largest
+ * a timecode can write); larger or non-digit t values (`1h2m`) in YouTube links are ignored.
  *
  * Safe.escape(value)       -> text safe between tags and inside "..." or '...' attributes.
  * Safe.url(value, fallback) -> the URL when it is http(s) or a PrivaTube page link
@@ -12,11 +26,13 @@
  *                            YouTube links become PrivaTube links, timecodes link to
  *                            videoId (&t=seconds; left as text without a videoId), other
  *                            http(s) links open in a new tab.
- * Safe.comment(html)       -> safe HTML for YouTube's textDisplay (HTML with <a>/<br>):
+ * Safe.create({ route }) -> a Safe with other route builders (tests).
+ * Safe.comment(html, { region }) -> safe HTML for YouTube's textDisplay (HTML with <a>/<br>):
  *                            only <br> and <a href> (URL-checked) survive; any other markup
  *                            is shown as text.
  */
-const Safe = (function () {
+function createSafe(options) {
+  const route = (options && options.route) || null;
   const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
   function escape(value) {
@@ -53,9 +69,11 @@ const Safe = (function () {
     });
   }
 
+  const MAX_SECONDS = 359999;
+
   function seconds(value) {
-    const m = /^(\d+)s?$/.exec(value);
-    return m ? Number(m[1]) : null;
+    const m = /^(\d{1,6})s?$/.exec(value);
+    return m && Number(m[1]) <= MAX_SECONDS ? Number(m[1]) : null;
   }
 
   function timeParam(query) {
@@ -71,28 +89,25 @@ const Safe = (function () {
 
   // A raw URL -> { href, external }, or null when it is not a safe link.
   // YouTube video/channel links point back at PrivaTube.
-  function resolve(raw) {
+  function resolve(raw, region) {
     const u = url(raw, null);
     if (u === null) return null;
     let m = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(.*)$/i.exec(u);
     if (m) {
       const params = m[1].split('&');
       const v = params.map(p => /^v=([A-Za-z0-9_-]{11})$/.exec(p)).find(Boolean);
-      if (v) return { href: video(v[1], null, timeParam(m[1])), external: false };
+      if (v) return { href: video(v[1], region, timeParam(m[1])), external: false };
     }
     m = /^https?:\/\/youtu\.be\/([A-Za-z0-9_-]{11})(?:[?#](.*))?$/i.exec(u);
-    if (m) return { href: video(m[1], null, timeParam((m[2] || '').split('#')[0])), external: false };
+    if (m) return { href: video(m[1], region, timeParam((m[2] || '').split('#')[0])), external: false };
     m = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})(?:[\/?#]|$)/i.exec(u);
-    if (m) return { href: 'index.html?ch=' + m[1], external: false };
+    if (m) return { href: route.channel(m[1], { region }), external: false };
     if (/^https?:/i.test(u)) return { href: u, external: true };
     return { href: u, external: false }; // PrivaTube page link
   }
 
   function video(id, region, t) {
-    let h = 'video.html?v=' + encodeURIComponent(id);
-    if (region) h += '&lang=' + encodeURIComponent(region);
-    if (t !== null && t !== undefined) h += '&t=' + t;
-    return h;
+    return route.video(id, { region, t });
   }
 
   function anchor(link, innerHtml) {
@@ -121,13 +136,14 @@ const Safe = (function () {
       if (/^https?:/i.test(piece)) {
         const trail = /[.,;:!?)\]}]+$/.exec(piece);
         if (trail) piece = piece.slice(0, -trail[0].length);
-        link = resolve(piece);
+        link = resolve(piece, opts.region);
         label = link && !link.external ? link.href : piece;
         token.lastIndex = m.index + piece.length;
       } else if (videoId) {
         const parts = piece.split(':').map(Number);
-        const t = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
-        link = { href: video(videoId, opts.region, t), external: false };
+        const rest = parts.slice(1);
+        const t = rest.every(n => n < 60) ? parts.reduce((total, n) => total * 60 + n, 0) : null;
+        if (t !== null && t <= MAX_SECONDS) link = { href: video(videoId, opts.region, t), external: false };
       }
       out += escape(src.slice(last, m.index));
       out += link ? anchor(link, escape(label)) : escape(piece);
@@ -136,7 +152,8 @@ const Safe = (function () {
     return out + escape(src.slice(last));
   }
 
-  function comment(html) {
+  function comment(html, options) {
+    const region = options && options.region;
     if (typeof html !== 'string' || !html) return '';
     const src = html.replace(/\s+/g, ' ').trim();
     const tag = /<br\s*\/?>|<a\s+href\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi;
@@ -147,17 +164,25 @@ const Safe = (function () {
       out += escapeKeepingEntities(src.slice(last, m.index));
       last = m.index + m[0].length;
       if (m[0][1] === 'b' || m[0][1] === 'B') { out += '<br>'; continue; }
-      const link = resolve(decodeEntities(m[1] !== undefined ? m[1] : m[2]));
+      const link = resolve(decodeEntities(m[1] !== undefined ? m[1] : m[2]), region);
       const innerRaw = decodeEntities(m[3]);
-      const shown = link && !link.external && resolve(innerRaw.trim()) ? link.href : null;
+      const shown = link && !link.external && resolve(innerRaw.trim(), region) ? link.href : null;
       const inner = shown !== null ? escape(shown) : escapeKeepingEntities(m[3]);
       out += link ? anchor(link, inner) : inner;
     }
     return out + escapeKeepingEntities(src.slice(last));
   }
 
-  return { escape, url, urlAttr, description, comment };
-})();
+  return { escape, url, urlAttr, description, comment, MAX_SECONDS };
+}
+
+function defaultRoute() {
+  if (typeof Route !== 'undefined') return Route;
+  if (typeof require !== 'undefined') return require('./route.js').Route;
+  throw new Error('Safe: web/route.js must be loaded before web/safetext.js');
+}
+
+const Safe = Object.assign(createSafe({ route: defaultRoute() }), { create: createSafe });
 
 // Export for Node.js (when running tests)
 if (typeof module !== 'undefined' && module.exports) {

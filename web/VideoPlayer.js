@@ -390,7 +390,7 @@ async function loadMoreComments(first = false) {
       console.warn("Comment text is empty, skipping:", comment);
       return; // Skip empty comments
     }
-    const text = Safe.comment(rawText);
+    const text = Safe.comment(rawText, { region: Route.parse(window.location.search).region });
     const likeCount = comment.likeCount ? comment.likeCount.toLocaleString() : '';
     commentDiv.className = 'comment';
     commentDiv.innerHTML = `
