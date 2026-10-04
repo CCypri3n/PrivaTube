@@ -4,7 +4,7 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 ## Language
 
-**API key**: The user's own YouTube Data API v3 key. Asked for in a modal on first load, validated with a test request, stored in `localStorage` under `api_key`. Never sent anywhere but Google. Handled only by `web/apikey.js` (`ApiKey.getKey()` / `ApiKey.clearKey()`); a key is accepted when Google says it is valid or that its quota is exceeded, and rejected (not saved) when invalid or on network error.
+**API key**: The user's own YouTube Data API v3 key. Asked for in a modal on first load, validated with a test request, stored in `localStorage` under `api_key`. Never sent anywhere but Google. Handled only by `web/apikey.js` (`ApiKey.getKey()` / `ApiKey.clearKey()`); a key is accepted when Google says it is valid or that its quota is exceeded, rejected ("invalid", not saved) when Google says it is bad (400, non-quota 403), and "try again" (not saved) on network or server trouble (5xx, 429).
 
 **Home / search / channel mode**: The three states of the browse page (`index.html`, `web/PrivaTube.js`): trending videos for a region, search results (videos and channels), or a channel's uploads. State is carried in URL query params.
 
