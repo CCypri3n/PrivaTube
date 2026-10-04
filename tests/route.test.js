@@ -103,9 +103,21 @@ test('hrefs', async (t) => {
     assert.equal(Route.search('a b'), 'index.html?q=a+b&lang=FR');
   });
   await t.test('search href parses back to the typed text', () => {
-    ['AT&T', 'a b&c', 'cafe \u00e9', '50%', 'x=y?z#w'].forEach((text) => {
+    ['AT&T', 'a b&c', 'cafe \u00e9', '50%', '100%', 'x=y?z#w'].forEach((text) => {
       assert.equal(Route.parse(Route.search(text)).query, text);
     });
+  });
+  await t.test('known limit: text that already looks like an escape reads back decoded', () => {
+    // Needed so old double-encoded addresses keep parsing; accepted trade-off.
+    assert.equal(Route.search('a%20b'), 'index.html?q=a%2520b&lang=FR');
+    assert.equal(Route.parse(Route.search('a%20b')).query, 'a b');
+    assert.equal(Route.parse(Route.search('50%25')).query, '50%');
+  });
+  await t.test('shared-link startup redirect keeps t (explicit), region from the address', () => {
+    const start = Route.parse('?v=X&lang=DE&t=90');
+    assert.equal(Route.video(start.videoId, { region: start.region, t: start.t }), 'video.html?v=X&lang=DE&t=90');
+    const noT = Route.parse('?v=X&lang=DE');
+    assert.equal(Route.video(noT.videoId, { region: noT.region, t: noT.t }), 'video.html?v=X&lang=DE');
   });
   await t.test('listing video links carry t only when passed explicitly', () => {
     const current = Route.parse('?v=X&lang=DE&t=90');
