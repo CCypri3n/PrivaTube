@@ -2,6 +2,9 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-05 — Player page: keep region select on the player URL (#5)
+- `web/VideoPlayer.js`: changing the region on the player page rebuilds the `video.html?v=` href instead of `Route.href`, which parsed a page without `v` as home and rewrote the address to `index.html`. Review fix for the Route module (#5).
+
 ## 2026-10-05 — Route module: one place for URL state (closes #5)
 - New pure `web/route.js` (`Route.parse`, `home`, `channel`, `video`, `search`, `href`, `share`), loaded by both pages before the page scripts; tested in `tests/route.test.js`. Mode precedence is `v`, then `q`, then `ch`, else home; region defaults to `FR` in one place; `t` is kept only as a non-negative integer.
 - `web/PrivaTube.js` and `web/VideoPlayer.js` no longer touch `URLSearchParams`: removed the per-handler param clearing, the four `lang=FR` defaults, both copies of `createVideoUrl`/`createChannelUrl`, the mode derivation (country select and page load) and the hardcoded share link, which now keeps `t`.

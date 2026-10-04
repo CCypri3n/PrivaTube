@@ -149,7 +149,8 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     btn.classList.remove('active');
     lastRegionCode = code;
     const route = { ...Route.parse(window.location.search), region: lastRegionCode };
-    window.history.replaceState({}, '', Route.href(route));
+    // Stay on the player page: rebuild the video href (a page without ?v= would parse as home).
+    if (route.videoId) window.history.replaceState({}, '', Route.video(route.videoId, route));
     mainHeader.href = Route.home({ region: lastRegionCode }); // Update header link to include region code
     });
  });
