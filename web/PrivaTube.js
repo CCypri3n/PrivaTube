@@ -28,9 +28,18 @@ function parseDurationToVisual(duration) {
     }
 }
 
+// Adapts a YouTube `videos` resource (with contentDetails + snippet) to the predicate.
+function isListableResource(v) {
+  return isListable({
+    duration: v.contentDetails.duration,
+    title: v.snippet.title,
+    description: v.snippet.description
+  });
+}
+
 // Keep only listable videos (see isListable in shorts.js). Videos absent from the
 // `videos` response (private/deleted) are dropped silently.
-async function filterOutShorts(videoItems) {
+async function filterListable(videoItems) {
   if (!videoItems.length) return [];
   const ids = videoItems.map(item => item.id.videoId || item.id).join(',');
   const response = await fetch(
@@ -38,11 +47,7 @@ async function filterOutShorts(videoItems) {
   );
   const data = await response.json();
   const allowedIds = new Set((data.items || [])
-    .filter(v => isListable({
-      duration: v.contentDetails.duration,
-      title: v.snippet.title,
-      description: v.snippet.description
-    }))
+    .filter(isListableResource)
     .map(v => v.id));
   return videoItems.filter(item => allowedIds.has(item.id.videoId || item.id));
 }
@@ -51,14 +56,14 @@ async function filterOutShorts(videoItems) {
 // fetchPage(token) -> { items (already filtered), nextPageToken }.
 const PAGE_SIZE = 24;
 const MAX_REFILL_PAGES = 5;
-async function collectPages(fetchPage, startToken) {
+async function collectPages(fetchPage, startToken, isCounted = () => true) {
   let items = [];
   let token = startToken;
   for (let i = 0; i < MAX_REFILL_PAGES; i++) {
     const page = await fetchPage(token);
     items = items.concat(page.items);
     token = page.nextPageToken || null;
-    if (!token || items.length >= PAGE_SIZE) break;
+    if (!token || items.filter(isCounted).length >= PAGE_SIZE) break;
   }
   return { items, nextPageToken: token };
 }
@@ -144,11 +149,7 @@ async function showHomepage(loadMore = false) {
       return {
         nextPageToken: data.nextPageToken,
         items: data.items
-          .filter(item => isListable({
-            duration: item.contentDetails.duration,
-            title: item.snippet.title,
-            description: item.snippet.description
-          }))
+          .filter(isListableResource)
           .map(item => ({ id: { kind: "youtube#video", videoId: item.id }, snippet: item.snippet }))
       };
     }, nextPageToken);
@@ -209,9 +210,9 @@ async function searchVideos(loadMore = false) {
           channelStats[ch.id] = ch.statistics.subscriberCount;
         });
       }
-      const filteredVideos = await filterOutShorts(videoItems);
+      const filteredVideos = await filterListable(videoItems);
       return { nextPageToken: data.nextPageToken, items: [...filteredVideos, ...channelItems] };
-    }, nextPageToken);
+    }, nextPageToken, item => item.id.kind === "youtube#video");
     nextPageToken = result.nextPageToken;
     const finalItems = result.items;
     if (loadMore) {
@@ -298,17 +299,16 @@ async function fetchChannelVideos(channelId, loadMore = false) {
         id: { kind: "youtube#video", videoId: item.snippet.resourceId.videoId },
         snippet: item.snippet
       }));
-      return { nextPageToken: playlistData.nextPageToken, items: await filterOutShorts(videoItems) };
+      return { nextPageToken: playlistData.nextPageToken, items: await filterListable(videoItems) };
     }, nextPageToken);
     const filteredVideos = result.items;
     nextPageToken = result.nextPageToken;
 
-    const videosToShow = filteredVideos; // not sliced: the page token has already advanced past these
-
+    
 if (loadMore) {
-      displayResults(true, videosToShow);
+      displayResults(true, filteredVideos);
     } else {
-      displayResults(false, videosToShow);
+      displayResults(false, filteredVideos);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (err) {
