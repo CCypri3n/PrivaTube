@@ -169,6 +169,18 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     });
   });
   
+  // The player page has no listings, so the Shorts setting needs no action here.
+  Settings.bindPanel({
+    onForgetKey: () => {
+      ApiKey.clearKey();
+      API_KEY = '';
+      ApiKey.getKey().then(key => {
+        API_KEY = key;
+        if (lastPlayedVideoId) playVideo(lastPlayedVideoId);
+      }).catch(err => console.error("API Key error:", err));
+    }
+  });
+
   ApiKey.getKey().then(key => {
   if (key && videoId) {
     API_KEY = key;

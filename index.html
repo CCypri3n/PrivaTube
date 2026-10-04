@@ -28,6 +28,8 @@
     </div>
 
 
+    <button id="settings-btn" class="settings-btn" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false">&#9881;</button>
+
     <div class="search-bar-wrapper">
         <div class="search-container">
             <input type="text" id="searchQuery" class="search-input" placeholder="Type to search...">
@@ -48,6 +50,7 @@
     <script src="web/apikey.js"></script>
     <script src="web/route.js"></script>
     <script src="web/safetext.js"></script>
+    <script src="web/settings.js"></script>
     <script src="web/shorts.js"></script>
     <script src="web/youtube.js"></script>
     <script src="web/PrivaTube.js"></script>
@@ -59,6 +62,17 @@
         <input type="password" id="api-key-input" placeholder="Paste your API key here">
         <button id="api-key-save-btn">Save</button>
         <p class="attention" style="margin-top:8px;">Your key is stored only in your browser.</p>
+    </div>
+    </div>
+
+    <div id="settings-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="api-key-modal-backdrop"></div>
+    <div class="api-key-modal-content">
+        <h2 id="settings-title">Settings</h2>
+        <label class="settings-row"><input type="checkbox" id="settings-shorts-toggle"> Show Shorts</label>
+        <button id="settings-forget-key-btn" class="settings-action-btn">Forget API key</button>
+        <button id="settings-close-btn" class="button" style="margin-top:12px;">Close</button>
+        <p class="attention" style="margin-top:8px;">Saved only in your browser.</p>
     </div>
     </div>
 
