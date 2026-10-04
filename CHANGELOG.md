@@ -2,6 +2,9 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-04 — Fix search crash without q in the address and stale channel banner (#17)
+- `web/PrivaTube.js`: `searchVideos` now declares `query` with `let` and `queryFromField` with `const`, so searching from the box works when the address has no `q` (it threw a `TypeError` before); empty search text just returns. `showHomepage` hides `#channel-banner` (`searchVideos` already did), so a previous channel's banner no longer stays above trending. Minimal fix; address handling is left for #5.
+
 ## 2026-10-04 — YouTube module step 3: player page, video and comments
 - `web/youtube.js`: added `video(id)` (video plus its channel in one object, counts as numbers or null, unknown video fails with `not_found`) and `comments(id, { order })` (`relevance` or `time`; Listing-style `more()` with no duplicates and end reported; each call keeps its own position). `makeListing` gained an optional request bound (one request per comment batch).
 - `web/VideoPlayer.js`: only calls the module and renders; removed its inline video, channel and comment requests (API key validation stays, #4) and the global `nextPageToken`. Failures map to messages (not found, quota "try again tomorrow", invalid key, offline); changing the comment sort restarts the list. Fixed latent errors in the old comment code (undefined `video`/`commentsDiv`).
