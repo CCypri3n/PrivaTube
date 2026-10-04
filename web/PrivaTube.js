@@ -1,11 +1,36 @@
-const BASE_URL = 'https://www.googleapis.com/youtube/v3/search';
-
+// Shared position for channel mode only (moves to a Listing in step 2).
 let nextPageToken = null;
+// Listing for the current home/search mode; "Load More" calls listing.more().
+let listing = null;
 let currentMode = 'home'; // 'home', 'search', or 'channel'
 let lastChannelId = '';
 let lastRegionCode = 'FR'; // for trending/homepage
 
 let API_KEY = '';
+
+// The YouTube module (web/youtube.js) is the only code that talks to YouTube for
+// trending and search. Built lazily so it picks up the key once it is known.
+function getYouTube() {
+  return YouTube.create({ apiKey: API_KEY, fetchJson: url => fetch(url).then(r => r.json()) });
+}
+
+function messageForFailure(error, fallback) {
+  const reason = error && error.reason;
+  if (reason === 'quota_exceeded') return "YouTube's daily limit for your API key has been reached. Please try again tomorrow.";
+  if (reason === 'invalid_key') return "Your API key is invalid. Please check it and try again.";
+  if (reason === 'offline') return "You appear to be offline. Please check your connection and try again.";
+  if (reason === 'not_found') return "Not found.";
+  return fallback;
+}
+
+// Seconds -> "h:mm:ss" or "m:ss".
+function formatSeconds(total) {
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const ss = sec.toString().padStart(2, '0');
+  return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
 
 function parseDurationToVisual(duration) {
     // Regular expression to parse the duration
@@ -137,32 +162,16 @@ async function showHomepage(loadMore = false) {
     lastRegionCode = lang;
   }
   const resultsDiv = document.getElementById('results');
-  if (!loadMore) {
+  if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading trending videos...</p>";
-    nextPageToken = null;
+    listing = getYouTube().trending(lastRegionCode);
   }
   try {
-    const result = await collectPages(async token => {
-      let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=${lastRegionCode}&maxResults=${PAGE_SIZE}&key=${API_KEY}`;
-      if (token) url += `&pageToken=${token}`;
-      const data = await (await fetch(url)).json();
-      return {
-        nextPageToken: data.nextPageToken,
-        items: data.items
-          .filter(isListableResource)
-          .map(item => ({ id: { kind: "youtube#video", videoId: item.id }, snippet: item.snippet }))
-      };
-    }, nextPageToken);
-    nextPageToken = result.nextPageToken;
-    const items = result.items;
-    if (loadMore) {
-      displayResults(true, items);
-    } else {
-      displayResults(false, items);
-    }
-    toggleLoadMoreButton(!!nextPageToken);
+    const { items, hasMore } = await listing.more();
+    displayItems(loadMore, items);
+    toggleLoadMoreButton(hasMore);
   } catch (error) {
-    resultsDiv.innerHTML = "<p>Could not load trending videos.</p>";
+    resultsDiv.innerHTML = `<p>${messageForFailure(error, "Could not load trending videos.")}</p>`;
     toggleLoadMoreButton(false);
     console.error(error);
   }
@@ -189,40 +198,19 @@ async function searchVideos(loadMore = false) {
   if (!query.trim()) return;
   currentMode = 'search';
   const resultsDiv = document.getElementById('results');
-  if (!loadMore) {
+  if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Searching...</p>";
-    nextPageToken = null;
+    // The q param holds an already-encoded string; the module encodes it itself.
+    let text = query;
+    try { text = decodeURIComponent(query); } catch (e) { /* use as typed */ }
+    listing = getYouTube().search(text);
   }
   try {
-    let channelStats = {};
-    const result = await collectPages(async token => {
-      let url = `${BASE_URL}?part=snippet&q=${query}&type=video,channel&key=${API_KEY}&maxResults=${PAGE_SIZE}`;
-      if (token) url += `&pageToken=${token}`;
-      const data = await (await fetch(url)).json();
-      const videoItems = data.items.filter(item => item.id.kind === "youtube#video");
-      const channelItems = data.items.filter(item => item.id.kind === "youtube#channel");
-      const channelIds = channelItems.map(item => item.id.channelId).join(',');
-      if (channelIds) {
-        const statsData = await (await fetch(
-          `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelIds}&key=${API_KEY}`
-        )).json();
-        statsData.items.forEach(ch => {
-          channelStats[ch.id] = ch.statistics.subscriberCount;
-        });
-      }
-      const filteredVideos = await filterListable(videoItems);
-      return { nextPageToken: data.nextPageToken, items: [...filteredVideos, ...channelItems] };
-    }, nextPageToken, item => item.id.kind === "youtube#video");
-    nextPageToken = result.nextPageToken;
-    const finalItems = result.items;
-    if (loadMore) {
-      displayResults(true, finalItems, channelStats);
-    } else {
-      displayResults(false, finalItems, channelStats);
-    }
-    toggleLoadMoreButton(!!nextPageToken);
+    const { items, hasMore } = await listing.more();
+    displayItems(loadMore, items);
+    toggleLoadMoreButton(hasMore);
   } catch (error) {
-    resultsDiv.innerHTML = "<p>Error searching videos.</p>";
+    resultsDiv.innerHTML = `<p>${messageForFailure(error, "Error searching videos.")}</p>`;
     toggleLoadMoreButton(false);
     console.error('Error:', error);
   }
@@ -243,6 +231,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   const bannerDiv = document.getElementById('channel-banner');
   if (!loadMore) {
     resultsDiv.innerHTML = "<p>Loading channel videos...</p>";
+    listing = null;
     nextPageToken = null;
     fetchChannelVideos.uploadsPlaylistId = null;
     fetchChannelVideos.lastChannelId = null;
@@ -306,9 +295,9 @@ async function fetchChannelVideos(channelId, loadMore = false) {
 
     
 if (loadMore) {
-      displayResults(true, filteredVideos);
+      displayLegacyResults(true, filteredVideos);
     } else {
-      displayResults(false, filteredVideos);
+      displayLegacyResults(false, filteredVideos);
     }
     toggleLoadMoreButton(!!nextPageToken);
   } catch (err) {
@@ -322,7 +311,66 @@ if (loadMore) {
 
 
 // --- Results Rendering Helpers ---
-async function displayResults(append, items, channelStats = {}) {
+// Renders YouTube module items (video / channel). Stats are already joined.
+function displayItems(append, items) {
+  const resultsDiv = document.getElementById('results');
+  if (!items || items.length === 0) {
+    if (!append) resultsDiv.innerHTML = "<p>No results found.</p>";
+    return;
+  }
+  const html = items.map(renderItem).join('');
+  if (append) {
+    resultsDiv.innerHTML += html;
+  } else {
+    resultsDiv.innerHTML = html;
+  }
+}
+
+function renderItem(item) {
+  if (item.kind === 'video') {
+    const dateStr = item.publishedAt
+      ? new Date(item.publishedAt).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' })
+      : '';
+    return `
+        <div class="video-item">
+            <a href="${createVideoUrl(item.id)}" target="_self">
+              <div class="video-thumb-container">
+                <img src="${item.thumbnail}" alt="${item.title}" />
+                <span class="video-duration">${formatSeconds(item.duration)}</span>
+              </div>
+            </a>
+            <h3>${item.title}</h3>
+            <div class="video-meta">
+            <span class="video-date">${dateStr}</span>
+            <span class="video-meta-sep">&nbsp;•&nbsp;</span>
+            <a href="${createChannelUrl(item.channelId)}" class="channel-link" target="_self">
+                ${item.channelTitle}
+            </a>
+            <span class="video-meta-sep">&nbsp;•&nbsp;</span>
+            <span class="video-views-render">
+                ${item.viewCount !== null ? item.viewCount.toLocaleString() : 'N/A'} views
+            </span>
+            </div>
+        </div>
+        `;
+  } else if (item.kind === 'channel') {
+    return `
+    <a href="${createChannelUrl(item.id)}" target="_self">
+      <div class="channel-item" data-channel-id="${item.id}" onclick="fetchChannelVideos('${item.id}')">
+        <img src="${item.thumbnail}" alt="${item.title}" />
+        <h3>${item.title}</h3>
+        <p class="attention">Click to view channel videos</p>
+        <p class="subs">${item.subscriberCount !== null ? `${item.subscriberCount.toLocaleString()} subscribers` : ''}</p>
+      </div>
+    </a>
+    `;
+  }
+  return '';
+}
+
+// Legacy rendering for channel mode (raw YouTube items + stats re-fetch).
+// TODO(step 2 of #10): delete once channels use the YouTube module.
+async function displayLegacyResults(append, items, channelStats = {}) {
   const resultsDiv = document.getElementById('results');
   if (!items || items.length === 0) {
     resultsDiv.innerHTML = "<p>No results found.</p>";
@@ -342,14 +390,14 @@ async function displayResults(append, items, channelStats = {}) {
     });
   }
   if (append) {
-    resultsDiv.innerHTML += items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
+    resultsDiv.innerHTML += items.map(item => renderLegacyResultItem(item, channelStats, videoStats)).join('');
   }
   else {
-    resultsDiv.innerHTML = items.map(item => renderResultItem(item, channelStats, videoStats)).join('');
+    resultsDiv.innerHTML = items.map(item => renderLegacyResultItem(item, channelStats, videoStats)).join('');
   }
 }
 
-function renderResultItem(item, channelStats = {}, videoStats = {}) {
+function renderLegacyResultItem(item, channelStats = {}, videoStats = {}) {
   if (item.id.kind === "youtube#video") {
     const stats = videoStats[item.id.videoId];
     // Format date as "YYYY-MM-DD" or any other style you prefer
