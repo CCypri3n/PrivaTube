@@ -2,8 +2,8 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
-## 2026-10-05 — Bigger settings gear button
-- `web/styles.css`: `.settings-btn` is now a 34 x 34 px rounded button (was about 29 x 26) with a larger gear (1.45em), vertically centred on the country button and kept 10-12 px to its left for every country code (`right: 104px`, `top: 20px`). Hover, focus and dimmed-while-playing styles unchanged. Checked in the browser pane on the browse page.
+## 2026-10-05 — Bigger gear icon on the settings button
+- `web/styles.css`: `.settings-btn` keeps the same size and position as the country button row (30 x 26 px, same top and height as the country button, 3-4 px to its left) and now centres a larger gear glyph (1.35em, was 0.95em) in it with flex; before, the glyph was small and sat off-centre. Hover, focus and dimmed-while-playing styles unchanged. Checked in the browser pane: the glyph's centre is within 0.3 px of the box centre. (Replaces the short-lived 34 x 34 version.)
 
 ## 2026-10-05 — Settings dialog redesign
 - `index.html`, `video.html` (identical markup): the settings dialog now has a small round close button (32 px, `x`) in the header next to the title instead of a full-width Close button; "Show Shorts" is an iOS-style switch (51 x 31 track, 27 px knob, crimson when on; still the same checkbox input with `role="switch"`, so keyboard and the saved preference behave as before); the two options sit in one rounded list with a label and a grey hint each, 56 px rows, and "Forget API key" became a quiet red "Forget" text button (44 px tall tap area). Fixed width 360 px (never wider than the screen minus 16 px per side).

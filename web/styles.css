@@ -285,21 +285,21 @@ h1, h5 {
 
 .settings-btn {
   position: fixed;
-  top: 20px;     /* centred on the region button (top 24px, ~26px tall) */
-  right: 104px;  /* region button is at most ~61px wide, ending 32px from the edge */
+  top: 24px;     /* same top and height as the region button */
+  right: 96px;   /* region button is at most ~61px wide, ending 32px from the edge */
   z-index: 30;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(128, 128, 128, 0.7);
   color: white;
-  font-size: 1.45em;
+  font-size: 1.35em;
   font-variant-emoji: text;
   line-height: 1;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
