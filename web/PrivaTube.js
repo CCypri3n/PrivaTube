@@ -6,20 +6,8 @@ let lastRegionCode = 'FR'; // for trending/homepage
 
 let API_KEY = '';
 
-// The YouTube module (web/youtube.js) is the only code that talks to YouTube for
-// trending and search. Built lazily so it picks up the key once it is known.
-function getYouTube() {
-  return YouTube.create({ apiKey: API_KEY, fetchJson: url => fetch(url).then(r => r.json()) });
-}
-
-function messageForFailure(error, fallback) {
-  const reason = error && error.reason;
-  if (reason === 'quota_exceeded') return "YouTube's daily limit for your API key has been reached. Please try again tomorrow.";
-  if (reason === 'invalid_key') return "Your API key is invalid. Please check it and try again.";
-  if (reason === 'offline') return "You appear to be offline. Please check your connection and try again.";
-  if (reason === 'not_found') return "Not found.";
-  return fallback;
-}
+// The YouTube module (web/youtube.js) is the only code that talks to YouTube;
+// Shell.youtube(API_KEY) builds it for the current key.
 
 // Seconds -> "h:mm:ss" or "m:ss".
 function formatSeconds(total) {
@@ -56,11 +44,7 @@ function startRender(loadMore) {
 // Region button, header link and tab title follow the region in the address.
 function syncRegionUI(region) {
   lastRegionCode = region;
-  const btn = document.getElementById('country-code-btn');
-  const mainHeader = document.getElementById('main-header-link');
-  if (btn) btn.textContent = `${region} ▼`;
-  if (mainHeader) mainHeader.href = Route.home({ region });
-  document.title = `PrivaTube - ${region}`;
+  Shell.showRegion(region, { title: true });
 }
 // Builder options carrying only the region from the address: never the whole
 // parsed route, so `t` (or anything else) can't leak into links.
@@ -99,13 +83,6 @@ function renderFromAddress() {
 }
 window.addEventListener('popstate', renderFromAddress);
 
-// Enter / search button: searchVideos pushes the address itself (deduped), so an
-// empty box does nothing and a repeated search adds no entry.
-function submitSearch(input) {
-  const text = input.value.trim();
-  if (text) searchVideos(false, text);
-}
-
 async function headerClick() {
   showHomepage();
 }
@@ -120,7 +97,7 @@ async function showHomepage(loadMore = false) {
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading trending videos...</p>";
-    listing = getYouTube().trending(lastRegionCode, listingOptions());
+    listing = Shell.youtube(API_KEY).trending(lastRegionCode, listingOptions());
   }
   try {
     const { items, hasMore } = await listing.more();
@@ -129,7 +106,7 @@ async function showHomepage(loadMore = false) {
     toggleLoadMoreButton(hasMore);
   } catch (error) {
     if (gen !== renderGeneration) return;
-    resultsDiv.innerHTML = `<p>${messageForFailure(error, "Could not load trending videos.")}</p>`;
+    resultsDiv.innerHTML = `<p>${Shell.messageForFailure(error, "Could not load trending videos.")}</p>`;
     toggleLoadMoreButton(false);
     console.error(error);
   }
@@ -148,7 +125,7 @@ async function searchVideos(loadMore = false, typedText = '') {
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Searching...</p>";
-    listing = getYouTube().search(query, listingOptions());
+    listing = Shell.youtube(API_KEY).search(query, listingOptions());
   }
   try {
     const { items, hasMore } = await listing.more();
@@ -157,7 +134,7 @@ async function searchVideos(loadMore = false, typedText = '') {
     toggleLoadMoreButton(hasMore);
   } catch (error) {
     if (gen !== renderGeneration) return;
-    resultsDiv.innerHTML = `<p>${messageForFailure(error, "Error searching videos.")}</p>`;
+    resultsDiv.innerHTML = `<p>${Shell.messageForFailure(error, "Error searching videos.")}</p>`;
     toggleLoadMoreButton(false);
     console.error('Error:', error);
   }
@@ -173,7 +150,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   const gen = startRender(loadMore);
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
-  const yt = getYouTube();
+  const yt = Shell.youtube(API_KEY);
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading channel videos...</p>";
     listing = null;
@@ -196,7 +173,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
       bannerDiv.style.display = 'none';
       resultsDiv.innerHTML = `<p>${error && error.reason === 'not_found'
         ? 'Channel not found.'
-        : messageForFailure(error, "Could not load channel videos.")}</p>`;
+        : Shell.messageForFailure(error, "Could not load channel videos.")}</p>`;
       toggleLoadMoreButton(false);
       console.error(error);
       return;
@@ -212,7 +189,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
     if (gen !== renderGeneration) return;
     resultsDiv.innerHTML = `<p>${error && error.reason === 'not_found'
       ? 'Channel not found.'
-      : messageForFailure(error, "Could not load channel videos.")}</p>`;
+      : Shell.messageForFailure(error, "Could not load channel videos.")}</p>`;
     toggleLoadMoreButton(false);
     console.error(error);
   }
@@ -282,61 +259,34 @@ function toggleLoadMoreButton(show) {
 }
 
 // --- Load More Button Handler & Enter-to-Search ---
-document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed on page load
-  const input = document.getElementById('searchQuery');
-  const btn = document.getElementById('country-code-btn');
-  const list = document.getElementById('country-list');
-  const dropdown = document.getElementById('country-dropdown');
-  const mainHeader = document.getElementById('main-header-link');
+document.addEventListener('DOMContentLoaded', () => {
   document.title = `PrivaTube`;
 
+  // searchVideos pushes the address itself (deduped), so an empty box does
+  // nothing and a repeated search adds no entry.
+  Shell.bindSearch({ onSearch: text => { if (text) searchVideos(false, text); } });
 
-  input.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-      submitSearch(input);
-    }
-  });
+  syncRegionUI(Route.parse(window.location.search).region);
 
-
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    list.style.display = (list.style.display === 'block') ? 'none' : 'block';
-    btn.classList.toggle('active');
-  });
-
-  // Hide dropdown when clicking outside
-  document.addEventListener('click', () => {
-    list.style.display = 'none';
-    btn.classList.remove('active');
-  });
-
-  const startRoute = Route.parse(window.location.search);
-  lastRegionCode = startRoute.region;
-  syncRegionUI(startRoute.region);
-
-  // Handle country selection
-  list.querySelectorAll('div').forEach(item => {
-  item.addEventListener('click', (e) => {
-    const code = item.getAttribute('data-code');
-    list.style.display = 'none';
-    btn.classList.remove('active');
-    const route = { ...Route.parse(window.location.search), region: code };
-    syncRegionUI(code);
-    // Go to the correct mode based on URL parameters
-    if (route.mode === 'home') {
-      window.history.replaceState({}, '', Route.href(route));
-      showHomepage();
-    } else {
-      window.history.pushState({}, '', Route.href(route));
-      if (route.mode === 'video') {
-        playVideo(route.videoId);
-      } else if (route.mode === 'search') {
-        searchVideos();
-      } else if (route.mode === 'channel') {
-        fetchChannelVideos(route.channelId);
+  Shell.bindRegion({
+    onPick: code => {
+      const route = { ...Route.parse(window.location.search), region: code };
+      syncRegionUI(code);
+      // Go to the correct mode based on URL parameters
+      if (route.mode === 'home') {
+        window.history.replaceState({}, '', Route.href(route));
+        showHomepage();
+      } else {
+        window.history.pushState({}, '', Route.href(route));
+        if (route.mode === 'video') {
+          playVideo(route.videoId);
+        } else if (route.mode === 'search') {
+          searchVideos();
+        } else if (route.mode === 'channel') {
+          fetchChannelVideos(route.channelId);
+        }
       }
-  }});
+    }
   });
 
   document.getElementById('load-more-btn').addEventListener('click', () => {
@@ -362,8 +312,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
   });
 
   // Only start app after API key is loaded!
-  ApiKey.getKey().then(key => {
-  if (key) {
+  Shell.start(key => {
     API_KEY = key;
     // Read the address now: Back/Forward may have moved it while the popup was up.
     const route = Route.parse(window.location.search);
@@ -382,20 +331,7 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
     } finally {
       initialRender = false;
     }
-  }
-  // If key is missing/invalid, ApiKey.getKey() keeps showing the popup until a key is accepted
-  }).catch(err => {
-    // Optional: log error, but don't show homepage
-    console.error("API Key error:", err);
   });
-
-  const searchBtn = document.getElementById('search-btn');
-  if (searchBtn) {
-    searchBtn.addEventListener('click', function() {
-      submitSearch(input);
-    });
-  }
-
 });
 
 // `t` only when a caller passes one (the startup redirect of a shared link).
