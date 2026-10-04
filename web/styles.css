@@ -860,3 +860,8 @@ h1, h5 {
   background: rgba(220,0,0,0.15);
   color: #fff;
 }
+.video-error {
+  color: crimson;
+  text-align: center;
+  padding: 16px;
+}

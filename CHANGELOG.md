@@ -2,6 +2,9 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-04 — Player page: show load errors in one place
+- `video.html`: new `#video-error` area (crimson, `role="alert"`). `web/VideoPlayer.js`: a video load failure shows one message there (video not found, quota "try again tomorrow", invalid key, offline, generic fallback) and hides and empties title, description, stats, channel info and comments, with no placeholders; a successful load or closing the player clears it. A comments-only failure keeps the video and shows the message in the comments area. `web/styles.css`: `.video-error`. Closes #16.
+
 ## 2026-10-04 — YouTube module step 3: player page, video and comments
 - `web/youtube.js`: added `video(id)` (video plus its channel in one object, counts as numbers or null, unknown video fails with `not_found`) and `comments(id, { order })` (`relevance` or `time`; Listing-style `more()` with no duplicates and end reported; each call keeps its own position). `makeListing` gained an optional request bound (one request per comment batch).
 - `web/VideoPlayer.js`: only calls the module and renders; removed its inline video, channel and comment requests (API key validation stays, #4) and the global `nextPageToken`. Failures map to messages (not found, quota "try again tomorrow", invalid key, offline); changing the comment sort restarts the list. Fixed latent errors in the old comment code (undefined `video`/`commentsDiv`).
