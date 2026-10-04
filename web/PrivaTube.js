@@ -31,6 +31,24 @@ function formatSeconds(total) {
 }
 
 
+// Shorts are shown only when the user switched them on in the settings panel.
+function listingOptions() {
+  return { includeShorts: Settings.getShowShorts() };
+}
+
+// Push the address, but replace it when it would not change (re-rendering the same listing).
+function setUrl(href) {
+  const same = new URL(href, window.location.href).search === window.location.search;
+  window.history[same ? 'replaceState' : 'pushState']({}, '', href);
+}
+
+// Re-render the current listing from scratch (after a settings change).
+function rerenderListing() {
+  if (currentMode === 'search') searchVideos();
+  else if (currentMode === 'channel') fetchChannelVideos(lastChannelId);
+  else showHomepage();
+}
+
 async function headerClick() {
   showHomepage();
 }
@@ -40,11 +58,11 @@ async function showHomepage(loadMore = false) {
   currentMode = 'home';
   document.getElementById('channel-banner').style.display = 'none';
   lastRegionCode = Route.parse(window.location.search).region;
-  window.history.pushState({}, '', Route.home({ region: lastRegionCode }));
+  setUrl(Route.home({ region: lastRegionCode }));
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Loading trending videos...</p>";
-    listing = getYouTube().trending(lastRegionCode);
+    listing = getYouTube().trending(lastRegionCode, listingOptions());
   }
   try {
     const { items, hasMore } = await listing.more();
@@ -64,12 +82,12 @@ async function searchVideos(loadMore = false) {
   const query = route.query || document.getElementById('searchQuery').value.trim();
   document.getElementById('channel-banner').style.display = 'none';
   if (!query.trim()) return;
-  window.history.pushState({}, '', Route.search(query, route));
+  setUrl(Route.search(query, route));
   currentMode = 'search';
   const resultsDiv = document.getElementById('results');
   if (!loadMore || !listing) {
     resultsDiv.innerHTML = "<p>Searching...</p>";
-    listing = getYouTube().search(query);
+    listing = getYouTube().search(query, listingOptions());
   }
   try {
     const { items, hasMore } = await listing.more();
@@ -88,7 +106,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
   window.scrollTo(0, 0);
   currentMode = 'channel';
   lastChannelId = channelId;
-  window.history.pushState({}, '', Route.channel(channelId, Route.parse(window.location.search)));
+  setUrl(Route.channel(channelId, Route.parse(window.location.search)));
   const resultsDiv = document.getElementById('results');
   const bannerDiv = document.getElementById('channel-banner');
   const yt = getYouTube();
@@ -99,7 +117,7 @@ async function fetchChannelVideos(channelId, loadMore = false) {
     // Its failure reason (not found, quota, key, offline) decides what is shown.
     try {
       const channel = await yt.channel(channelId);
-      listing = yt.channelUploads(channelId, { uploadsPlaylistId: channel.uploadsPlaylistId });
+      listing = yt.channelUploads(channelId, { ...listingOptions(), uploadsPlaylistId: channel.uploadsPlaylistId });
       document.title = `PrivaTube - Checking out "${channel.title}"`;
       bannerDiv.style.display = 'block';
       bannerDiv.innerHTML = `
@@ -269,6 +287,18 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure player is closed
       searchVideos(true);
     } else if (currentMode === 'channel') {
       fetchChannelVideos(lastChannelId, true);
+    }
+  });
+
+  Settings.bindPanel({
+    onShortsChange: rerenderListing,
+    onForgetKey: () => {
+      ApiKey.clearKey();
+      API_KEY = '';
+      ApiKey.getKey().then(key => {
+        API_KEY = key;
+        rerenderListing();
+      }).catch(err => console.error("API Key error:", err));
     }
   });
 

@@ -2,6 +2,14 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-05 — Settings panel: forget API key and Show Shorts toggle (closes #14)
+- New `web/settings.js` (`Settings.getShowShorts()` / `setShowShorts()`, `create({ storage })`, `bindPanel`), loaded by both pages; tested in `tests/settings.test.js` with a fake storage (default off, persistence, invalid stored values -> off, throwing or missing storage tolerated with the value kept for the page session).
+- Both pages: gear button in the header left of the region dropdown, opening a "Settings" modal (same style as the key and share popups; `role="dialog"`, labelled button, Close button, Escape and backdrop click close it, focus moves in and back to the button).
+- "Forget API key": closes the panel, `ApiKey.clearKey()`, the key popup asks for a new key; then the browse page re-renders its listing and the player page reloads the video.
+- "Show Shorts": browser-only (`localStorage` `show_shorts`, not in the URL). The browse page passes `includeShorts` to trending, search and channel uploads and re-renders the current listing on change. The player page has no listings, so the toggle only saves there.
+- Browse page: re-rendering replaces the address instead of pushing a duplicate history entry (`setUrl`).
+- Not checked in a real browser yet.
+
 ## 2026-10-05 — Safe text module: escape and URL-check all YouTube-supplied text (closes #6) [5cd55f1, 17b80bc]
 - New pure `web/safetext.js` (`Safe.escape`, `url`, `urlAttr`, `description`, `comment`), loaded by both pages after `route.js`; tested in `tests/safetext.test.js` (hostile strings, URL schemes, link/timecode rewriting, comment sanitising, plus a static scan that API fields in `web/PrivaTube.js` / `web/VideoPlayer.js` templates go through `Safe`).
 - Fixes an XSS: titles, channel names, banner title, thumbnail/banner/avatar URLs, comment author names/avatars/dates and counts were interpolated into `innerHTML` unescaped (a title like `x" onerror="alert(1)` injected an attribute on the browse page). All of those now go through `Safe.escape` / `Safe.urlAttr`; non-http(s) image URLs become empty (comment avatars fall back to the unavailable-avatar icon).
