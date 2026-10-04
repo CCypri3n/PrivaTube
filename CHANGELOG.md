@@ -2,6 +2,13 @@
 
 One entry per commit, newest first. Each entry: date, commit subject, what changed and why, issue reference.
 
+## 2026-10-04 — API key module: shared popup, check and storage (closes #4)
+- New `web/apikey.js` (`ApiKey.getKey()`, `ApiKey.clearKey()`, `ApiKey.create({ storage, fetch, ui })`); loaded by both pages before the page scripts. Deleted the duplicated `fetchApiKey` from `web/PrivaTube.js` and `web/VideoPlayer.js`.
+- The check now distinguishes rejected (invalid message, not saved), quota exceeded (key is valid: saved) and network error (network message, not saved); the error is hidden on the next success.
+- `video.html` key input is now `type="password"` like `index.html`; popup markup is identical.
+- Added `tests/apikey.test.js` with fake storage, network and UI.
+- Closes #4.
+
 ## 2026-10-04 — Fill YouTube module test gaps, document includeShorts
 - Added `tests/youtube-gaps.test.js`: when the refill bound is reached while more videos exist, `trending` and `channelUploads` return the partial batch with `hasMore` true (and the listing continues without repeats). Checked by breaking the bound and the end-of-list flag.
 - Already covered, left alone: `includeShorts` on `channelUploads` (`tests/youtube-channels.test.js`) and comment `order` reaching the request (`tests/youtube-video.test.js`, whose fake serves pages by the requested order; breaking it fails them).
