@@ -11,13 +11,17 @@ PrivaTube is a lightweight, privacy-focused alternative to YouTube. It uses the 
 *   **Simple UI:** Focus on the videos without unnecessary clutter.
 *   **Local Execution:** Run PrivaTube directly on your computer.
 *   **Google API Powered:** Access up-to-date YouTube data via the official API.
+*   **Trending, search and channels:** Browse trending videos per country (FR, DE, GB, ES, US), search videos and channels, and open channel pages with their uploads. Shorts are filtered out.
+*   **Privacy-friendly player:** Videos play through `youtube-nocookie.com` embeds, with title, channel, views, likes and a linkified description (timestamps and YouTube links open inside PrivaTube).
+*   **Comments:** Top or newest first, with "Load More".
+*   **Sharing:** Copy a PrivaTube link to any video.
 
 ## Usage
 
 1.  Clone this repository:  
     `git clone https://github.com/CCypri3n/PrivaTube.git`
-2.  Open `index.html` in your web browser.
-3.  Get a YouTube API key (see instructions below) and configure the app for full functionality.
+2.  Open `index.html` in your web browser (or visit the hosted GitHub Pages version).
+3.  Get a YouTube API key (see instructions below) and paste it into the prompt on first load. It is stored only in your browser's `localStorage` and sent only to Google.
 
 ## YouTube API Key
 
@@ -43,7 +47,6 @@ Contributions are welcome! Feel free to submit pull requests with improvements, 
 
 ## TODO
 
-*   Add option to sort comments
 *   Refresh button for recent comments?
 
 ## License
