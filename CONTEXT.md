@@ -14,6 +14,10 @@ A static, build-less web app: a privacy-focused YouTube front-end. It talks dire
 
 **Shorts filter**: Videos of 180 seconds or less, or tagged `#shorts`, are dropped from listings, as are livestreams/upcoming videos (duration `P0D`). Lives in `web/shorts.js` (pure, unit-tested); trending, search and channel listings share it and refill pages until ~24 items remain.
 
+**Listing**: A paged list of videos or channels (trending, search results, a channel's uploads) with a "Load More" button. A listing knows where it left off and applies the Shorts filter before returning items.
+
+**YouTube module**: The single place that talks to the YouTube Data API. It is given the API key, returns simple ready-to-show items (not Google's raw format), reports specific failures (invalid key, quota exceeded, offline, not found), and can be swapped for sample data in tests. Planned in #3.
+
 **Comment sort**: `relevance` ("Top comments", default) or `time` ("Newest first"), passed to the `commentThreads` endpoint.
 
 **Share link**: A `video.html?v=<id>` URL pointing back at PrivaTube rather than YouTube. Links in descriptions and comments are rewritten the same way.
