@@ -15,3 +15,7 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 ### Domain docs
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Changelog
+
+Every commit adds an entry to `CHANGELOG.md` (newest first: date, commit subject, what changed and why, issue reference). Add it in the same commit; backfill the short hash in the next commit.
